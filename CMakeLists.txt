@@ -11,7 +11,7 @@ find_package(catkin REQUIRED COMPONENTS
   cmake_modules
   controller_interface
   controller_manager
-  kld_parser
+  kdl_parser
 #  orocos_kdl
   trajectory_msgs
   urdf
@@ -158,7 +158,7 @@ add_library(${PROJECT_NAME}
 target_link_libraries(${PROJECT_NAME}
   ${catkin_LIBRARIES}
   ${Eigen_LIBRARIES}
-# )
+)
 
 #############
 ## Install ##

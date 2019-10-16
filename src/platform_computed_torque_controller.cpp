@@ -3,6 +3,8 @@
 #include <platform_computed_torque_controller/platform_computed_torque_controller.h>
 #include <pluginlib/class_list_macros.h>
 
+#define DOF 2
+
 namespace effort_controllers
 {
     PlatformComputedTorqueController::PlatformComputedTorqueController(void):
@@ -99,6 +101,10 @@ namespace effort_controllers
 		ddqr_.resize(nJoints_);
 		torque_.resize(nJoints_);
         fext_.resize(chain_.getNrOfSegments());
+
+        qp_.resize(DOF);
+        dqp_.resize(DOF);
+        ddqp_.resize(DOF);
 		
 		Kp_.resize(nJoints_,nJoints_);
 		Kd_.resize(nJoints_,nJoints_);        
@@ -132,6 +138,13 @@ namespace effort_controllers
 		qr_=q_;
 		dqr_=dq_;
 		SetToZero(ddqr_);
+
+        for(unsigned int i=0;i < DOF;i++)
+        {
+            qp_(i)=*imu_.getOrientation();
+            dqp_(i)=*imu_.getAngularVelocity();
+            ddqp_(i)=*imu_.getLinearAcceleration();
+        }
 		
 		struct sched_param param;
 		if(!node_.getParam("priority",param.sched_priority))
@@ -151,6 +164,15 @@ namespace effort_controllers
     void PlatformComputedTorqueController::update(const ros::Time &time,
             const ros::Duration &duration)
     {
+        for(unsigned int i=0;i < DOF;i++)
+        {
+            qp_(i)=*imu_.getOrientation();
+            dqp_(i)=*imu_.getAngularVelocity();
+            ddqp_(i)=*imu_.getLinearAcceleration();
+            double a = qp_(i);
+            std::cout<<"qp_: "<<qp_(i)<<std::endl;
+        }
+
 		for(unsigned int i=0;i < nJoints_;i++)
 		{
 			q_(i)=joints_[i].getPosition();

@@ -41,6 +41,11 @@ namespace effort_controllers
         KDL::JntArray qr_;
 		KDL::JntArray dqr_;
 		KDL::JntArray ddqr_;
+
+        //Platform angles: qp_(0)=pitch qp_(1)=roll
+        KDL::JntArray qp_;
+        KDL::JntArray dqp_;
+        KDL::JntArray ddqp_;
 			
 		KDL::JntArray torque_;
         KDL::Wrenches fext_;
