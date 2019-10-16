@@ -1,0 +1,10 @@
+<library path="lib/libplatform_computed_torque_controller">
+    <class>
+        <description>
+            Implements a computed torque controller for robot on a non
+            inertial platform. Reference inputs are joint angles, velocities
+            and accelerations. Works with an Effort output, so requires an
+            EffortJointInterface.
+        </description>
+    </class>
+</library>

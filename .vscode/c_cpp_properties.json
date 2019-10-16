@@ -26,9 +26,13 @@
                 "/home/carlos/catkin_ws/src/industrial_core/simple_message/include/**",
                 "/home/carlos/catkin_ws/src/twil/twil_gazebo_ros_control/include/**",
                 "/home/carlos/catkin_ws/src/wam_joint_trajectories/include/**",
-                "/usr/include/**"
+                "/home/carlos/catkin_ws/src/platform_computed_torque_controller/include/**",
+                "/usr/include",
+                "/usr/include/eigen3",
+                "${workspaceFolder}/include"
+
             ],
-            "name": "ROS",
+            "name": "Linux",
             "intelliSenseMode": "gcc-x64",
             "compilerPath": "/usr/bin/gcc",
             "cStandard": "c11",
