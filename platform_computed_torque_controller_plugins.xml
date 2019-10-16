@@ -1,5 +1,7 @@
 <library path="lib/libplatform_computed_torque_controller">
-    <class>
+    <class name="effort_controllers/PlatformComputedTorqueController"
+	type="effort_controllers::PlatformComputedTorqueController"
+	base_class_type="controller_interface::ControllerBase">
         <description>
             Implements a computed torque controller for robot on a non
             inertial platform. Reference inputs are joint angles, velocities
