@@ -23,11 +23,15 @@ namespace effort_controllers
     {
         ros::NodeHandle node_;
 
-        hardware_interface::EffortJointInterface *hw_;
-        //TODO check if should use imu interface instead
-        hardware_interface::ImuSensorHandle imu_;
+        hardware_interface::RobotHW *robot_hw_;
+        hardware_interface::EffortJointInterface *effort_hw_;
         std::vector<hardware_interface::JointHandle> joints_;
+        
         int nJoints_;
+        
+        //TODO check if should use imu interface instead
+        hardware_interface::ImuSensorHandle imu_handle_;
+        //hardware_interface::ImuSensorHandle imu_;
 
         ros::Subscriber sub_command_;
 
@@ -59,10 +63,15 @@ namespace effort_controllers
         public:
         PlatformComputedTorqueController(void);
         ~PlatformComputedTorqueController(void);
-
-        bool init(hardware_interface::EffortJointInterface *hw, ros::NodeHandle &n);
+        
+       // bool init(hardware_interface::EffortJointInterface *hw, ros::NodeHandle &n);
         void starting(const ros::Time &time);
         void update(const ros::Time &time, const ros::Duration &duration);
+
+        protected:
+            virtual bool initRequest(hardware_interface::RobotHW *robot_hw,
+                ros::NodeHandle &n, ros::NodeHandle &controller_n,
+                std::set<std::string> &claimed_resources);
 
     };
 }

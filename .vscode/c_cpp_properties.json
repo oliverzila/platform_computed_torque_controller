@@ -32,7 +32,7 @@
                 "${workspaceFolder}/include"
 
             ],
-            "name": "ROS",
+            "name": "Linux",
             "intelliSenseMode": "gcc-x64",
             "compilerPath": "/usr/bin/gcc",
             "cStandard": "c11",

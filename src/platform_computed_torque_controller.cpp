@@ -8,7 +8,7 @@
 namespace effort_controllers
 {
     PlatformComputedTorqueController::PlatformComputedTorqueController(void):
-        q_(0),dq_(0),v_(0),qr_(0),dqr_(0),ddqr_(0),torque_(0),fext_(0)
+        q_(0),dq_(0),v_(0),qr_(0),dqr_(0),ddqr_(0),torque_(0),fext_(0), qp_(0),dqp_(0),ddqp_(0)
     {  
     }
 
@@ -17,11 +17,24 @@ namespace effort_controllers
         sub_command_.shutdown();
     }
 
-    bool PlatformComputedTorqueController::init
-            (hardware_interface::EffortJointInterface *hw, ros::NodeHandle &n)
+    bool PlatformComputedTorqueController::initRequest(hardware_interface::RobotHW *robot_hw,
+                ros::NodeHandle &n, ros::NodeHandle &controller_n,
+                std::set<std::string> &claimed_resources)
     {
-        node_=n;
-        hw_=hw;
+        if(state_ != CONSTRUCTED)
+		{
+			ROS_ERROR("Failed to construct controller");
+			return false;
+		}
+		
+		node_ = n;
+        robot_hw_ = robot_hw;
+		effort_hw_ = robot_hw_->get<hardware_interface::EffortJointInterface>();
+		if (!effort_hw_)
+		{
+			ROS_ERROR("This controller requires a hardware interface of type hardware_interface::EffortJointInterface");
+			return false;
+		}
 
         std::vector<std::string> joint_names;
         if(!node_.getParam("joints",joint_names))
@@ -37,7 +50,7 @@ namespace effort_controllers
 	    {
 		    try
 	    	{
-	    		joints_.push_back(hw->getHandle(joint_names[i]));
+	    		joints_.push_back(effort_hw_->getHandle(joint_names[i]));
 	    	}
 	    	catch (const hardware_interface::HardwareInterfaceException &e)
 	    	{
@@ -46,6 +59,32 @@ namespace effort_controllers
 	    	}
 	    }
 
+		hardware_interface::ImuSensorInterface *imu_hw_ = robot_hw->get<hardware_interface::ImuSensorInterface>();
+		if (!imu_hw_)
+		{
+			ROS_ERROR("This controller requires a hardware interface of type ImuSensorInterface");
+			return false;
+		}
+
+		std::string imu_name;
+		if(!node_.getParam("imu_name",imu_name))
+        {
+            ROS_ERROR("No 'imu' in controller. (namespace: %s)",
+                    node_.getNamespace().c_str());
+            return false;
+        }
+
+     	try
+		{
+			imu_handle_ = imu_hw_->getHandle(imu_name);
+		}
+		catch (const hardware_interface::HardwareInterfaceException &e)
+		{
+			ROS_ERROR_STREAM("Exception thrown: " << e.what());
+			return false;
+		}
+		 
+		// Command Topic
         sub_command_ = node_.subscribe("command", 1,
                     &PlatformComputedTorqueController::commandCB, this);
         
@@ -125,6 +164,7 @@ namespace effort_controllers
 		}
 		Kd_=Eigen::Map<Eigen::MatrixXd>(KdVec.data(),nJoints_,nJoints_).transpose();
 		
+		state_ = INITIALIZED;
 		return true;
 	}
 
@@ -141,9 +181,9 @@ namespace effort_controllers
 
         for(unsigned int i=0;i < DOF;i++)
         {
-            qp_(i)=*imu_.getOrientation();
-            dqp_(i)=*imu_.getAngularVelocity();
-            ddqp_(i)=*imu_.getLinearAcceleration();
+            qp_(i)=*imu_handle_.getOrientation();
+            dqp_(i)=*imu_handle_.getAngularVelocity();
+            ddqp_(i)=*imu_handle_.getLinearAcceleration();
         }
 		
 		struct sched_param param;
@@ -166,9 +206,9 @@ namespace effort_controllers
     {
         for(unsigned int i=0;i < DOF;i++)
         {
-            qp_(i)=*imu_.getOrientation();
-            dqp_(i)=*imu_.getAngularVelocity();
-            ddqp_(i)=*imu_.getLinearAcceleration();
+            qp_(i) = *imu_handle_.getOrientation();
+            dqp_(i)= *imu_handle_.getAngularVelocity();
+            ddqp_(i)= *imu_handle_.getLinearAcceleration();
             double a = qp_(i);
             std::cout<<"qp_: "<<qp_(i)<<std::endl;
         }
