@@ -17,22 +17,23 @@ namespace effort_controllers
         sub_command_.shutdown();
     }
 
-    bool PlatformComputedTorqueController::initRequest(hardware_interface::RobotHW *robot_hw,
-                ros::NodeHandle &n, ros::NodeHandle &controller_n,
-                std::set<std::string> &claimed_resources)
+    bool PlatformComputedTorqueController::init(hardware_interface::EffortJointInterface *effort_hw,
+            hardware_interface::ImuSensorInterface* imu_hw, ros::NodeHandle &n)
     {
-        if(state_ != CONSTRUCTED)
-		{
-			ROS_ERROR("Failed to construct controller");
-			return false;
-		}
-		
+
 		node_ = n;
-        robot_hw_ = robot_hw;
-		effort_hw_ = robot_hw_->get<hardware_interface::EffortJointInterface>();
+
+		effort_hw_ = effort_hw;
 		if (!effort_hw_)
 		{
 			ROS_ERROR("This controller requires a hardware interface of type hardware_interface::EffortJointInterface");
+			return false;
+		}
+
+		imu_hw_ = imu_hw;
+		if (!imu_hw_)
+		{
+			ROS_ERROR("This controller requires a hardware interface of type ImuSensorInterface");
 			return false;
 		}
 
@@ -59,13 +60,6 @@ namespace effort_controllers
 	    	}
 	    }
 
-		hardware_interface::ImuSensorInterface *imu_hw_ = robot_hw->get<hardware_interface::ImuSensorInterface>();
-		if (!imu_hw_)
-		{
-			ROS_ERROR("This controller requires a hardware interface of type ImuSensorInterface");
-			return false;
-		}
-
 		std::string imu_name;
 		if(!node_.getParam("imu_name",imu_name))
         {
@@ -83,7 +77,7 @@ namespace effort_controllers
 			ROS_ERROR_STREAM("Exception thrown: " << e.what());
 			return false;
 		}
-		 
+		
 		// Command Topic
         sub_command_ = node_.subscribe("command", 1,
                     &PlatformComputedTorqueController::commandCB, this);
@@ -164,7 +158,6 @@ namespace effort_controllers
 		}
 		Kd_=Eigen::Map<Eigen::MatrixXd>(KdVec.data(),nJoints_,nJoints_).transpose();
 		
-		state_ = INITIALIZED;
 		return true;
 	}
 
@@ -181,7 +174,8 @@ namespace effort_controllers
 
         for(unsigned int i=0;i < DOF;i++)
         {
-            qp_(i)=*imu_handle_.getOrientation();
+		//	TODO quaternion -> roll and pitch for qp_
+        //     qp_(i)=*imu_handle_.getOrientation();
             dqp_(i)=*imu_handle_.getAngularVelocity();
             ddqp_(i)=*imu_handle_.getLinearAcceleration();
         }
@@ -206,7 +200,8 @@ namespace effort_controllers
     {
         for(unsigned int i=0;i < DOF;i++)
         {
-            qp_(i) = *imu_handle_.getOrientation();
+		//	TODO quaternion -> roll and pitch for qp_
+        //  qp_(i)=*imu_handle_.getOrientation();
             dqp_(i)= *imu_handle_.getAngularVelocity();
             ddqp_(i)= *imu_handle_.getLinearAcceleration();
             double a = qp_(i);

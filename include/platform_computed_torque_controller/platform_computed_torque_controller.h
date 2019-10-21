@@ -29,9 +29,9 @@ namespace effort_controllers
         
         int nJoints_;
         
-        //TODO check if should use imu interface instead
+        // IMU
         hardware_interface::ImuSensorHandle imu_handle_;
-        //hardware_interface::ImuSensorHandle imu_;
+        hardware_interface::ImuSensorInterface *imu_hw_;
 
         ros::Subscriber sub_command_;
 
@@ -47,6 +47,7 @@ namespace effort_controllers
 		KDL::JntArray ddqr_;
 
         //Platform angles: qp_(0)=pitch qp_(1)=roll
+        // remember to get quaternion from orientation and convert to roll and pitch
         KDL::JntArray qp_;
         KDL::JntArray dqp_;
         KDL::JntArray ddqp_;
@@ -64,14 +65,10 @@ namespace effort_controllers
         PlatformComputedTorqueController(void);
         ~PlatformComputedTorqueController(void);
         
-       // bool init(hardware_interface::EffortJointInterface *hw, ros::NodeHandle &n);
+        bool init(hardware_interface::EffortJointInterface *effort_hw, 
+        hardware_interface::ImuSensorInterface* imu_hw, ros::NodeHandle &n);
         void starting(const ros::Time &time);
         void update(const ros::Time &time, const ros::Duration &duration);
-
-        protected:
-            virtual bool initRequest(hardware_interface::RobotHW *robot_hw,
-                ros::NodeHandle &n, ros::NodeHandle &controller_n,
-                std::set<std::string> &claimed_resources);
 
     };
 }
