@@ -17,20 +17,21 @@ namespace effort_controllers
         sub_command_.shutdown();
     }
 
-    bool PlatformComputedTorqueController::init(hardware_interface::EffortJointInterface *effort_hw,
-            hardware_interface::ImuSensorInterface* imu_hw, ros::NodeHandle &n)
+    bool PlatformComputedTorqueController::init(hardware_interface::RobotHW *robot_hw, ros::NodeHandle &n)
     {
 
 		node_ = n;
+		robot_hw_ = robot_hw;
 
-		effort_hw_ = effort_hw;
+		effort_hw_ = robot_hw_->get<hardware_interface::EffortJointInterface>();
+
 		if (!effort_hw_)
 		{
 			ROS_ERROR("This controller requires a hardware interface of type hardware_interface::EffortJointInterface");
 			return false;
 		}
 
-		imu_hw_ = imu_hw;
+		imu_hw_ = robot_hw_->get<hardware_interface::ImuSensorInterface>();
 		if (!imu_hw_)
 		{
 			ROS_ERROR("This controller requires a hardware interface of type ImuSensorInterface");
@@ -172,13 +173,13 @@ namespace effort_controllers
 		dqr_=dq_;
 		SetToZero(ddqr_);
 
-        for(unsigned int i=0;i < DOF;i++)
-        {
+        // for(unsigned int i=0;i < DOF;i++)
+        // {
 		//	TODO quaternion -> roll and pitch for qp_
         //     qp_(i)=*imu_handle_.getOrientation();
-            dqp_(i)=*imu_handle_.getAngularVelocity();
-            ddqp_(i)=*imu_handle_.getLinearAcceleration();
-        }
+        //     dqp_(i)=*imu_handle_.getAngularVelocity();
+        //     ddqp_(i)=*imu_handle_.getLinearAcceleration();
+        // }
 		
 		struct sched_param param;
 		if(!node_.getParam("priority",param.sched_priority))
@@ -198,15 +199,15 @@ namespace effort_controllers
     void PlatformComputedTorqueController::update(const ros::Time &time,
             const ros::Duration &duration)
     {
-        for(unsigned int i=0;i < DOF;i++)
-        {
+        // for(unsigned int i=0;i < DOF;i++)
+        // {
 		//	TODO quaternion -> roll and pitch for qp_
         //  qp_(i)=*imu_handle_.getOrientation();
-            dqp_(i)= *imu_handle_.getAngularVelocity();
-            ddqp_(i)= *imu_handle_.getLinearAcceleration();
-            double a = qp_(i);
-            std::cout<<"qp_: "<<qp_(i)<<std::endl;
-        }
+        //     dqp_(i)= *imu_handle_.getAngularVelocity();
+        //     ddqp_(i)= *imu_handle_.getLinearAcceleration();
+        //     double a = qp_(i);
+        //     std::cout<<"qp_: "<<qp_(i)<<std::endl;
+        // }
 
 		for(unsigned int i=0;i < nJoints_;i++)
 		{

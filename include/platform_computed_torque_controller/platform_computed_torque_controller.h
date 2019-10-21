@@ -5,6 +5,7 @@
 #include <hardware_interface/joint_command_interface.h>
 #include <hardware_interface/imu_sensor_interface.h>
 #include <controller_interface/controller.h>
+#include <controller_interface/multi_interface_controller.h>
 #include <trajectory_msgs/JointTrajectoryPoint.h>
 
 #include <Eigen/Core>
@@ -19,7 +20,8 @@
 namespace effort_controllers
 {
     class PlatformComputedTorqueController: public controller_interface::
-        Controller<hardware_interface::EffortJointInterface>
+        MultiInterfaceController<hardware_interface::EffortJointInterface,
+        hardware_interface::ImuSensorInterface>
     {
         ros::NodeHandle node_;
 
@@ -65,8 +67,7 @@ namespace effort_controllers
         PlatformComputedTorqueController(void);
         ~PlatformComputedTorqueController(void);
         
-        bool init(hardware_interface::EffortJointInterface *effort_hw, 
-        hardware_interface::ImuSensorInterface* imu_hw, ros::NodeHandle &n);
+        bool init(hardware_interface::RobotHW *robot_hw, ros::NodeHandle &n);
         void starting(const ros::Time &time);
         void update(const ros::Time &time, const ros::Duration &duration);
 
