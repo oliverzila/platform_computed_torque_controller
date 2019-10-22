@@ -8,7 +8,10 @@
 namespace effort_controllers
 {
     PlatformComputedTorqueController::PlatformComputedTorqueController(void):
-        q_(0),dq_(0),v_(0),qr_(0),dqr_(0),ddqr_(0),torque_(0),fext_(0), qp_(0),dqp_(0),ddqp_(0)
+		controller_interface::
+        MultiInterfaceController<hardware_interface::EffortJointInterface,
+        hardware_interface::ImuSensorInterface> (true),
+		q_(0),dq_(0),v_(0),qr_(0),dqr_(0),ddqr_(0),torque_(0),fext_(0), qp_(0),dqp_(0),ddqp_(0)
     {  
     }
 
@@ -78,7 +81,7 @@ namespace effort_controllers
 			ROS_ERROR_STREAM("Exception thrown: " << e.what());
 			return false;
 		}
-		
+
 		// Command Topic
         sub_command_ = node_.subscribe("command", 1,
                     &PlatformComputedTorqueController::commandCB, this);
@@ -173,13 +176,14 @@ namespace effort_controllers
 		dqr_=dq_;
 		SetToZero(ddqr_);
 
-        // for(unsigned int i=0;i < DOF;i++)
-        // {
-		//	TODO quaternion -> roll and pitch for qp_
-        //     qp_(i)=*imu_handle_.getOrientation();
-        //     dqp_(i)=*imu_handle_.getAngularVelocity();
-        //     ddqp_(i)=*imu_handle_.getLinearAcceleration();
-        // }
+        for(unsigned int i=0;i < DOF;i++)
+        {
+            quatp_(i)=*imu_handle_.getOrientation();
+            dqp_(i)=*imu_handle_.getAngularVelocity();
+            ddqp_(i)=*imu_handle_.getLinearAcceleration();
+        }
+		KDL::Rotation::Quaternion(quatp_(0),quatp_(1),quatp_(2),quatp_(3)).GetRPY(
+			qp_(0),qp_(1),qp_(2));
 		
 		struct sched_param param;
 		if(!node_.getParam("priority",param.sched_priority))
@@ -199,15 +203,14 @@ namespace effort_controllers
     void PlatformComputedTorqueController::update(const ros::Time &time,
             const ros::Duration &duration)
     {
-        // for(unsigned int i=0;i < DOF;i++)
-        // {
-		//	TODO quaternion -> roll and pitch for qp_
-        //  qp_(i)=*imu_handle_.getOrientation();
-        //     dqp_(i)= *imu_handle_.getAngularVelocity();
-        //     ddqp_(i)= *imu_handle_.getLinearAcceleration();
-        //     double a = qp_(i);
-        //     std::cout<<"qp_: "<<qp_(i)<<std::endl;
-        // }
+        for(unsigned int i=0;i < DOF;i++)
+        {
+            quatp_(i)=*imu_handle_.getOrientation();
+            dqp_(i)=*imu_handle_.getAngularVelocity();
+            ddqp_(i)=*imu_handle_.getLinearAcceleration();
+        }
+		KDL::Rotation::Quaternion(quatp_(0),quatp_(1),quatp_(2),quatp_(3)).GetRPY(
+			qp_(0),qp_(1),qp_(2));
 
 		for(unsigned int i=0;i < nJoints_;i++)
 		{

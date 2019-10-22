@@ -21,8 +21,7 @@ geometry_msgs/Vector3 linear_acceleration
 float64[9] linear_acceleration_covariance
 
 
- 
-        hardware_interface::ImuSensorInterface* imu_hw
-	hardware_interface::ImuSensorInterface* imu_hw
-	bool PlatformComputedTorqueController::init(hardware_interface::EffortJointInterface *effort_hw,
-            hardware_interface::ImuSensorInterface* imu_hw, ros::NodeHandle &n)
+ libgazebo_ros_imu_sensor.so
+
+
+
