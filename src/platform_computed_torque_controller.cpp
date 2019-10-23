@@ -176,14 +176,17 @@ namespace effort_controllers
 		dqr_=dq_;
 		SetToZero(ddqr_);
 
-        for(unsigned int i=0;i < DOF;i++)
+       	for (unsigned int i = 0; i < 3; i++)
+		{
+			quatp_(i) = imu_handle_.getOrientation()[i];
+		}
+        for(unsigned int i=0;i < 2;i++)
         {
-            quatp_(i)=*imu_handle_.getOrientation();
-            dqp_(i)=*imu_handle_.getAngularVelocity();
-            ddqp_(i)=*imu_handle_.getLinearAcceleration();
+            dqp_(i) = imu_handle_.getAngularVelocity()[i];
+            ddqp_(i) = imu_handle_.getLinearAcceleration()[i];
         }
 		KDL::Rotation::Quaternion(quatp_(0),quatp_(1),quatp_(2),quatp_(3)).GetRPY(
-			qp_(0),qp_(1),qp_(2));
+		qp_(2),qp_(0),qp_(1));
 		
 		struct sched_param param;
 		if(!node_.getParam("priority",param.sched_priority))
@@ -203,14 +206,17 @@ namespace effort_controllers
     void PlatformComputedTorqueController::update(const ros::Time &time,
             const ros::Duration &duration)
     {
-        for(unsigned int i=0;i < DOF;i++)
+		for (unsigned int i = 0; i < 3; i++)
+		{
+			quatp_(i) = imu_handle_.getOrientation()[i];
+		}
+        for(unsigned int i=0;i < 2;i++)
         {
-            quatp_(i)=*imu_handle_.getOrientation();
-            dqp_(i)=*imu_handle_.getAngularVelocity();
-            ddqp_(i)=*imu_handle_.getLinearAcceleration();
+            dqp_(i) = imu_handle_.getAngularVelocity()[i];
+            ddqp_(i) = imu_handle_.getLinearAcceleration()[i];
         }
 		KDL::Rotation::Quaternion(quatp_(0),quatp_(1),quatp_(2),quatp_(3)).GetRPY(
-			qp_(0),qp_(1),qp_(2));
+			qp_(2),qp_(0),qp_(1));
 
 		for(unsigned int i=0;i < nJoints_;i++)
 		{
