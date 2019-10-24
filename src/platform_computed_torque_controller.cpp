@@ -18,6 +18,7 @@ namespace effort_controllers
     PlatformComputedTorqueController::~PlatformComputedTorqueController(void)
     {
         sub_command_.shutdown();
+		sub_imu_.shutdown();
     }
 
     bool PlatformComputedTorqueController::init(hardware_interface::RobotHW *robot_hw, ros::NodeHandle &n)
@@ -34,12 +35,12 @@ namespace effort_controllers
 			return false;
 		}
 
-		imu_hw_ = robot_hw_->get<hardware_interface::ImuSensorInterface>();
-		if (!imu_hw_)
-		{
-			ROS_ERROR("This controller requires a hardware interface of type ImuSensorInterface");
-			return false;
-		}
+		// imu_hw_ = robot_hw_->get<hardware_interface::ImuSensorInterface>();
+		// if (!imu_hw_)
+		// {
+		// 	ROS_ERROR("This controller requires a hardware interface of type ImuSensorInterface");
+		// 	return false;
+		// }
 
         std::vector<std::string> joint_names;
         if(!node_.getParam("joints",joint_names))
@@ -64,27 +65,31 @@ namespace effort_controllers
 	    	}
 	    }
 
-		std::string imu_name;
-		if(!node_.getParam("imu_name",imu_name))
-        {
-            ROS_ERROR("No 'imu' in controller. (namespace: %s)",
-                    node_.getNamespace().c_str());
-            return false;
-        }
+		// std::string imu_name;
+		// if(!node_.getParam("imu_name",imu_name))
+        // {
+        //     ROS_ERROR("No 'imu' in controller. (namespace: %s)",
+        //             node_.getNamespace().c_str());
+        //     return false;
+        // }
 
-     	try
-		{
-			imu_handle_ = imu_hw_->getHandle(imu_name);
-		}
-		catch (const hardware_interface::HardwareInterfaceException &e)
-		{
-			ROS_ERROR_STREAM("Exception thrown: " << e.what());
-			return false;
-		}
+     	// try
+		// {
+		// 	imu_handle_ = imu_hw_->getHandle(imu_name);
+		// }
+		// catch (const hardware_interface::HardwareInterfaceException &e)
+		// {
+		// 	ROS_ERROR_STREAM("Exception thrown: " << e.what());
+		// 	return false;
+		// }
 
 		// Command Topic
         sub_command_ = node_.subscribe("command", 1,
                     &PlatformComputedTorqueController::commandCB, this);
+
+		// IMU Topic
+        sub_imu_ = node_.subscribe("imu/data", 1,
+                    &PlatformComputedTorqueController::imuCB, this);
         
         std::string robot_desc_string;
         if(!node_.getParam("/robot_description", robot_desc_string))
@@ -176,17 +181,17 @@ namespace effort_controllers
 		dqr_=dq_;
 		SetToZero(ddqr_);
 
-       	for (unsigned int i = 0; i < 3; i++)
-		{
-			quatp_(i) = imu_handle_.getOrientation()[i];
-		}
-        for(unsigned int i=0;i < 2;i++)
-        {
-            dqp_(i) = imu_handle_.getAngularVelocity()[i];
-            ddqp_(i) = imu_handle_.getLinearAcceleration()[i];
-        }
-		KDL::Rotation::Quaternion(quatp_(0),quatp_(1),quatp_(2),quatp_(3)).GetRPY(
-		qp_(2),qp_(0),qp_(1));
+       	// for (unsigned int i = 0; i < 3; i++)
+		// {
+		// 	quatp_(i) = imu_handle_.getOrientation()[i];
+		// }
+        // for(unsigned int i=0;i < 2;i++)
+        // {
+        //     dqp_(i) = imu_handle_.getAngularVelocity()[i];
+        //     ddqp_(i) = imu_handle_.getLinearAcceleration()[i];
+        // }
+		// KDL::Rotation::Quaternion(quatp_(0),quatp_(1),quatp_(2),quatp_(3)).GetRPY(
+		// qp_(2),qp_(0),qp_(1));
 		
 		struct sched_param param;
 		if(!node_.getParam("priority",param.sched_priority))
@@ -206,17 +211,17 @@ namespace effort_controllers
     void PlatformComputedTorqueController::update(const ros::Time &time,
             const ros::Duration &duration)
     {
-		for (unsigned int i = 0; i < 3; i++)
-		{
-			quatp_(i) = imu_handle_.getOrientation()[i];
-		}
-        for(unsigned int i=0;i < 2;i++)
-        {
-            dqp_(i) = imu_handle_.getAngularVelocity()[i];
-            ddqp_(i) = imu_handle_.getLinearAcceleration()[i];
-        }
-		KDL::Rotation::Quaternion(quatp_(0),quatp_(1),quatp_(2),quatp_(3)).GetRPY(
-			qp_(2),qp_(0),qp_(1));
+		// for (unsigned int i = 0; i < 3; i++)
+		// {
+		// 	quatp_(i) = imu_handle_.getOrientation()[i];
+		// }
+        // for(unsigned int i=0;i < 2;i++)
+        // {
+        //     dqp_(i) = imu_handle_.getAngularVelocity()[i];
+        //     ddqp_(i) = imu_handle_.getLinearAcceleration()[i];
+        // }
+		// KDL::Rotation::Quaternion(quatp_(0),quatp_(1),quatp_(2),quatp_(3)).GetRPY(
+		// 	qp_(2),qp_(0),qp_(1));
 
 		for(unsigned int i=0;i < nJoints_;i++)
 		{
@@ -243,6 +248,26 @@ namespace effort_controllers
 			ddqr_(i)=referencePoint->accelerations[i];
 		}                
     }
+
+	void PlatformComputedTorqueController::imuCB(const sensor_msgs::Imu::ConstPtr &imu_data)
+	{
+		quatp_(0) = imu_data->orientation.x;
+		quatp_(1) = imu_data->orientation.y;
+		quatp_(2) = imu_data->orientation.z;
+		quatp_(3) = imu_data->orientation.w;
+		      
+        dqp_(0) = imu_data->angular_velocity.x;
+		dqp_(1) = imu_data->angular_velocity.y;
+		dqp_(2) = imu_data->angular_velocity.z;
+
+		// TODO convert to angular acceleration
+        ddqp_(0) = 0.0; //imu_data->linear_acceleration.x;
+		ddqp_(1) = 0.0; //imu_data->linear_acceleration.y;
+		ddqp_(2) = 0.0; //imu_data->linear_acceleration.z;
+		KDL::Rotation::Quaternion(quatp_(0),quatp_(1),quatp_(2),quatp_(3)).GetRPY(
+			qp_(2),qp_(0),qp_(1));
+
+	}
 
 }
 

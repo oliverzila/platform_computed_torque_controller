@@ -14,6 +14,7 @@ find_package(catkin REQUIRED COMPONENTS
   kdl_parser
 #  orocos_kdl
   trajectory_msgs
+  sensor_msgs
   urdf
 )
 
@@ -112,7 +113,7 @@ find_package(Eigen3 REQUIRED)
 catkin_package(
   INCLUDE_DIRS include
   LIBRARIES platform_computed_torque_controller
-  CATKIN_DEPENDS cmake_modules controller_interface controller_manager kld_parser trajectory_msgs urdf
+  CATKIN_DEPENDS cmake_modules controller_interface controller_manager kld_parser trajectory_msgs sensor_msgs urdf
 #  DEPENDS orocos_kdl Eigen
 )
 

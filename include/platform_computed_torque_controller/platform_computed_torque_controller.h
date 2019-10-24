@@ -7,6 +7,7 @@
 #include <controller_interface/controller.h>
 #include <controller_interface/multi_interface_controller.h>
 #include <trajectory_msgs/JointTrajectoryPoint.h>
+#include <sensor_msgs/Imu.h>
 
 #include <Eigen/Core>
 
@@ -36,6 +37,7 @@ namespace effort_controllers
         hardware_interface::ImuSensorInterface *imu_hw_;
 
         ros::Subscriber sub_command_;
+        ros::Subscriber sub_imu_;
 
         KDL::Tree tree_;
         KDL::Chain chain_;
@@ -63,6 +65,7 @@ namespace effort_controllers
 
         void commandCB(const trajectory_msgs::JointTrajectoryPoint::
         ConstPtr &reference);
+        void imuCB(const sensor_msgs::Imu::ConstPtr &imu_data);
 
         public:
         PlatformComputedTorqueController(void);
