@@ -183,7 +183,7 @@ namespace effort_controllers
         for(unsigned int i=0;i < 2;i++)
         {
             dqp_(i) = imu_handle_.getAngularVelocity()[i];
-            ddqp_(i) = imu_handle_.getLinearAcceleration()[i];
+            ddqp_(i) = imu_handle_.getLinearAcceleration()[i]; //TODO get angular acceleration
         }
 		KDL::Rotation::Quaternion(quatp_(0),quatp_(1),quatp_(2),quatp_(3)).GetRPY(
 		qp_(2),qp_(0),qp_(1));
@@ -213,7 +213,7 @@ namespace effort_controllers
         for(unsigned int i=0;i < 2;i++)
         {
             dqp_(i) = imu_handle_.getAngularVelocity()[i];
-            ddqp_(i) = imu_handle_.getLinearAcceleration()[i];
+            ddqp_(i) = imu_handle_.getLinearAcceleration()[i]; //TODO get angular acceleration
         }
 		KDL::Rotation::Quaternion(quatp_(0),quatp_(1),quatp_(2),quatp_(3)).GetRPY(
 			qp_(2),qp_(0),qp_(1));
