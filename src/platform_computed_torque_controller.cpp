@@ -65,13 +65,13 @@ namespace effort_controllers
 	    	}
 	    }
 
-		// std::string imu_name;
-		// if(!node_.getParam("imu_name",imu_name))
-        // {
-        //     ROS_ERROR("No 'imu' in controller. (namespace: %s)",
-        //             node_.getNamespace().c_str());
-        //     return false;
-        // }
+		std::string imu_name;
+		if(!node_.getParam("imu_name",imu_name))
+        {
+            ROS_ERROR("No 'imu' in controller. (namespace: %s)",
+                    node_.getNamespace().c_str());
+            return false;
+        }
 
      	// try
 		// {
@@ -83,13 +83,13 @@ namespace effort_controllers
 		// 	return false;
 		// }
 
+		// IMU Topic
+		sub_imu_ = node_.subscribe("imu/data", 1,
+					&PlatformComputedTorqueController::imuCB, this);
+
 		// Command Topic
         sub_command_ = node_.subscribe("command", 1,
                     &PlatformComputedTorqueController::commandCB, this);
-
-		// IMU Topic
-        sub_imu_ = node_.subscribe("imu/data", 1,
-                    &PlatformComputedTorqueController::imuCB, this);
         
         std::string robot_desc_string;
         if(!node_.getParam("/robot_description", robot_desc_string))
@@ -144,6 +144,7 @@ namespace effort_controllers
 		torque_.resize(nJoints_);
         fext_.resize(chain_.getNrOfSegments());
 
+		quatp_.resize(4);
         qp_.resize(DOF);
         dqp_.resize(DOF);
         ddqp_.resize(DOF);
@@ -188,7 +189,7 @@ namespace effort_controllers
         // for(unsigned int i=0;i < 2;i++)
         // {
         //     dqp_(i) = imu_handle_.getAngularVelocity()[i];
-        //     ddqp_(i) = imu_handle_.getLinearAcceleration()[i];
+        //     ddqp_(i) = imu_handle_.getLinearAcceleration()[i]; //TODO get angular acceleration
         // }
 		// KDL::Rotation::Quaternion(quatp_(0),quatp_(1),quatp_(2),quatp_(3)).GetRPY(
 		// qp_(2),qp_(0),qp_(1));
@@ -218,7 +219,7 @@ namespace effort_controllers
         // for(unsigned int i=0;i < 2;i++)
         // {
         //     dqp_(i) = imu_handle_.getAngularVelocity()[i];
-        //     ddqp_(i) = imu_handle_.getLinearAcceleration()[i];
+        //     ddqp_(i) = imu_handle_.getLinearAcceleration()[i]; //TODO get angular acceleration
         // }
 		// KDL::Rotation::Quaternion(quatp_(0),quatp_(1),quatp_(2),quatp_(3)).GetRPY(
 		// 	qp_(2),qp_(0),qp_(1));
@@ -260,15 +261,13 @@ namespace effort_controllers
 		dqp_(1) = imu_data->angular_velocity.y;
 		dqp_(2) = imu_data->angular_velocity.z;
 
-		// TODO convert to angular acceleration
-        ddqp_(0) = 0.0; //imu_data->linear_acceleration.x;
-		ddqp_(1) = 0.0; //imu_data->linear_acceleration.y;
-		ddqp_(2) = 0.0; //imu_data->linear_acceleration.z;
+		// // TODO convert to angular acceleration
+        ddqp_(0) = imu_data->linear_acceleration.x;
+		ddqp_(1) = imu_data->linear_acceleration.y;
+		ddqp_(2) = imu_data->linear_acceleration.z;
 		KDL::Rotation::Quaternion(quatp_(0),quatp_(1),quatp_(2),quatp_(3)).GetRPY(
 			qp_(2),qp_(0),qp_(1));
-
 	}
-
 }
 
 PLUGINLIB_EXPORT_CLASS(effort_controllers::PlatformComputedTorqueController,

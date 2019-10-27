@@ -51,8 +51,8 @@ namespace effort_controllers
 		KDL::JntArray ddqr_;
 
         //Platform angles: qp_(0)=pitch qp_(1)=roll
-        // remember to get quaternion from orientation and convert to roll and pitch
-         KDL::JntArray quatp_;
+        // remember to get quaternion from orientation and convert to roll, pitch, yaw
+        KDL::JntArray quatp_;
         KDL::JntArray qp_;
         KDL::JntArray dqp_;
         KDL::JntArray ddqp_;
