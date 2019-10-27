@@ -31,6 +31,7 @@ namespace effort_controllers
         std::vector<hardware_interface::JointHandle> joints_;
         
         int nJoints_;
+        int nJointsVirt_;
         
         // IMU
         hardware_interface::ImuSensorHandle imu_handle_;
@@ -41,6 +42,7 @@ namespace effort_controllers
 
         KDL::Tree tree_;
         KDL::Chain chain_;
+        KDL::Chain chain_platform_;
         KDL::ChainIdSolver_RNE *idsolver_;
 
         KDL::JntArray q_;
@@ -51,8 +53,8 @@ namespace effort_controllers
 		KDL::JntArray ddqr_;
 
         //Platform angles: qp_(0)=pitch qp_(1)=roll
-        // remember to get quaternion from orientation and convert to roll, pitch, yaw
-        KDL::JntArray quatp_;
+        // remember to get quaternion from orientation and convert to roll and pitch
+         KDL::JntArray quatp_;
         KDL::JntArray qp_;
         KDL::JntArray dqp_;
         KDL::JntArray ddqp_;
@@ -62,6 +64,9 @@ namespace effort_controllers
 			
 		Eigen::MatrixXd Kp_;
 		Eigen::MatrixXd Kd_;
+
+        Eigen::MatrixXd KpVirt_;
+        Eigen::MatrixXd KdVirt_;
 
         void commandCB(const trajectory_msgs::JointTrajectoryPoint::
         ConstPtr &reference);

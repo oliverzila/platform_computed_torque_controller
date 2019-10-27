@@ -64,14 +64,14 @@ namespace effort_controllers
 	    		return false;
 	    	}
 	    }
-
-		std::string imu_name;
-		if(!node_.getParam("imu_name",imu_name))
-        {
-            ROS_ERROR("No 'imu' in controller. (namespace: %s)",
-                    node_.getNamespace().c_str());
-            return false;
-        }
+		std::cout<<"Size joints_: "<<joints_.size()<<std::endl;
+		// std::string imu_name;
+		// if(!node_.getParam("imu_name",imu_name))
+        // {
+        //     ROS_ERROR("No 'imu' in controller. (namespace: %s)",
+        //             node_.getNamespace().c_str());
+        //     return false;
+        // }
 
      	// try
 		// {
@@ -83,13 +83,13 @@ namespace effort_controllers
 		// 	return false;
 		// }
 
-		// IMU Topic
-		sub_imu_ = node_.subscribe("imu/data", 1,
-					&PlatformComputedTorqueController::imuCB, this);
-
 		// Command Topic
         sub_command_ = node_.subscribe("command", 1,
                     &PlatformComputedTorqueController::commandCB, this);
+
+		// IMU Topic
+        sub_imu_ = node_.subscribe("imu/data", 1,
+                    &PlatformComputedTorqueController::imuCB, this);		
         
         std::string robot_desc_string;
         if(!node_.getParam("/robot_description", robot_desc_string))
@@ -124,25 +124,61 @@ namespace effort_controllers
 			return false;
 		}
 
+		// chain_platform_ = KDL::Chain();
+		// KDL::Joint joint1_(KDL::Joint::None); // inertial ref and platform
+		// KDL::Frame frame1_ = KDL::Frame(KDL::Vector(0.0, 0.0, 0.0));
+		// chain_platform_.addSegment(KDL::Segment(joint1_,frame1_));
+
+		// KDL::Joint joint_pitch_(KDL::Joint::RotY); // pitch joint
+		// KDL::Frame frame_pitch_ = KDL::Frame(KDL::Vector(0.0, 0.0, 0.0));
+		// chain_platform_.addSegment(KDL::Segment(joint_pitch_,frame_pitch_));
+		
+		// KDL::Joint joint_roll_(KDL::Joint::RotX); // roll joint
+		// KDL::Frame frame_roll_ = KDL::Frame(KDL::Vector(0.0, 0.0, 0.0));
+		// chain_platform_.addSegment(KDL::Segment(joint_roll_,frame_roll_));
+
+		std::string platformRoot;
+		if(!node_.getParam("platform_chain/root",platformRoot))
+		{
+			ROS_ERROR("Could not find 'platform_root' parameter.");
+			return false;
+		}
+		
+		std::string platformTip;
+		if(!node_.getParam("platform_chain/tip",platformTip))
+		{
+			ROS_ERROR("Could not find 'chain/tip' parameter.");
+			return false;
+		}
+		
+		if (!tree_.getChain(platformRoot,chainTip,chain_platform_)) 
+		{
+			ROS_ERROR("Failed to get chain from KDL tree.");
+			return false;
+		}
+
+		//chain_platform_.addChain(chain_);
+
         KDL::Vector g;
         node_.param("gravity/x",g[0],0.0);
         node_.param("gravity/y",g[1],0.0);
         node_.param("gravity/z",g[2],-9.8);
         
-        if((idsolver_=new::KDL::ChainIdSolver_RNE(chain_,g))==NULL)
+        if((idsolver_=new::KDL::ChainIdSolver_RNE(chain_platform_,g))==NULL)
         {
             ROS_ERROR("Failed to create ChainIDSolver_RNE.");
             return false;
         }
-
-		q_.resize(nJoints_);
-		dq_.resize(nJoints_);
-		v_.resize(nJoints_);
-		qr_.resize(nJoints_);
-		dqr_.resize(nJoints_);
-		ddqr_.resize(nJoints_);
-		torque_.resize(nJoints_);
-        fext_.resize(chain_.getNrOfSegments());
+		
+		nJointsVirt_ = nJoints_+DOF;
+		q_.resize(nJointsVirt_);
+		dq_.resize(nJointsVirt_);
+		v_.resize(nJointsVirt_);
+		qr_.resize(nJointsVirt_);
+		dqr_.resize(nJointsVirt_);
+		ddqr_.resize(nJointsVirt_);
+		torque_.resize(nJointsVirt_);
+        fext_.resize(chain_platform_.getNrOfSegments());
 
 		quatp_.resize(4);
         qp_.resize(DOF);
@@ -168,31 +204,47 @@ namespace effort_controllers
 		}
 		Kd_=Eigen::Map<Eigen::MatrixXd>(KdVec.data(),nJoints_,nJoints_).transpose();
 		
+		KpVirt_ = Eigen::MatrixXd::Zero(nJointsVirt_, nJointsVirt_);
+		KpVirt_.bottomRightCorner(nJoints_,nJoints_) = Kp_;
+		KdVirt_ = Eigen::MatrixXd::Zero(nJointsVirt_, nJointsVirt_);
+		KpVirt_.bottomRightCorner(nJoints_,nJoints_) = Kd_;
+
 		return true;
 	}
 
     void PlatformComputedTorqueController::starting(const ros::Time &time)
     {
-		for(unsigned int i=0;i < nJoints_;i++)
-		{
-			q_(i)=joints_[i].getPosition();
-			dq_(i)=joints_[i].getVelocity();
-		}
-		qr_=q_;
-		dqr_=dq_;
-		SetToZero(ddqr_);
-
-       	// for (unsigned int i = 0; i < 3; i++)
+		// for (unsigned int i = 0; i < 3; i++)
 		// {
 		// 	quatp_(i) = imu_handle_.getOrientation()[i];
 		// }
         // for(unsigned int i=0;i < 2;i++)
         // {
         //     dqp_(i) = imu_handle_.getAngularVelocity()[i];
-        //     ddqp_(i) = imu_handle_.getLinearAcceleration()[i]; //TODO get angular acceleration
+        //     ddqp_(i) = imu_handle_.getLinearAcceleration()[i];
         // }
 		// KDL::Rotation::Quaternion(quatp_(0),quatp_(1),quatp_(2),quatp_(3)).GetRPY(
 		// qp_(2),qp_(0),qp_(1));
+
+		// robot joints initial condition
+		for(unsigned int i=0;i < nJoints_;i++)
+		{
+			q_(i+DOF)=joints_[i].getPosition();
+			std::cout<<"Posicao inicial junta "<<i<<": "<<q_(i+DOF)<<std::endl;
+			dq_(i+DOF)=joints_[i].getVelocity();
+			qr_(i+DOF)=q_(i+DOF);
+			dqr_(i+DOF)=dq_(i+DOF);
+		}
+
+		// platform initial conditions
+		for(unsigned int i=0;i < DOF;i++)
+		{
+			q_(i)= 0.0; //qp_(i);
+			dq_(i)= 0.0; //dqp_(i);
+			qr_(i)=q_(i);
+			dqr_(i)=dq_(i);
+		}
+		SetToZero(ddqr_);
 		
 		struct sched_param param;
 		if(!node_.getParam("priority",param.sched_priority))
@@ -219,55 +271,72 @@ namespace effort_controllers
         // for(unsigned int i=0;i < 2;i++)
         // {
         //     dqp_(i) = imu_handle_.getAngularVelocity()[i];
-        //     ddqp_(i) = imu_handle_.getLinearAcceleration()[i]; //TODO get angular acceleration
+        //     ddqp_(i) = imu_handle_.getLinearAcceleration()[i];
         // }
 		// KDL::Rotation::Quaternion(quatp_(0),quatp_(1),quatp_(2),quatp_(3)).GetRPY(
 		// 	qp_(2),qp_(0),qp_(1));
 
+		// Get robot joints state
 		for(unsigned int i=0;i < nJoints_;i++)
 		{
-			q_(i)=joints_[i].getPosition();
-			dq_(i)=joints_[i].getVelocity();
+			q_(i+DOF)=joints_[i].getPosition();
+			dq_(i+DOF)=joints_[i].getVelocity();
+		}
+		// Get platform orientation
+		for(unsigned int i=0;i < DOF;i++)
+		{
+			q_(i)=qp_(i);
+			dq_(i)=dqp_(i);
+
+			qr_(i)=q_(i);
+			dqr_(i)=dq_(i);
 		}
 		for(unsigned int i=0;i < fext_.size();i++) fext_[i].Zero();
-		
-		v_.data=ddqr_.data+Kp_*(qr_.data-q_.data)+Kd_*(dqr_.data-dq_.data);
+
+		v_.data=ddqr_.data+KpVirt_*(qr_.data-q_.data)+KdVirt_*(dqr_.data-dq_.data);
+		std::cout<<"Segmentos: "<<chain_platform_.getNrOfSegments()<<std::endl;
+		std::cout<<"Juntas: "<<chain_platform_.getNrOfJoints()<<std::endl;
 		if(idsolver_->CartToJnt(q_,dq_,v_,fext_,torque_) < 0)
 		        ROS_ERROR("KDL inverse dynamics solver failed.");
-		
+		for(int i=0;i<nJointsVirt_;i++)
+			std::cout<<"qr: "<<qr_(i)<<"q"<<i<<": "<<q_(i)<<" dq"<<i<<": "<<dq_(i)<<" v_"<<i<<": "<<v_(i)<<" torque"<<i<<": "<<torque_(i)<<std::endl;
 		for(unsigned int i=0;i < nJoints_;i++)
-		        joints_[i].setCommand(torque_(i));
+		        joints_[i].setCommand(torque_(i+DOF));
 	}
+
+
 	
 	void PlatformComputedTorqueController::commandCB(const trajectory_msgs::
 	        JointTrajectoryPoint::ConstPtr &referencePoint)
 	{
 		for(unsigned int i=0;i < nJoints_;i++)
 		{
-			qr_(i)=referencePoint->positions[i];
-			dqr_(i)=referencePoint->velocities[i];
-			ddqr_(i)=referencePoint->accelerations[i];
+			qr_(i+DOF)=referencePoint->positions[i];
+			dqr_(i+DOF)=referencePoint->velocities[i];
+			ddqr_(i+DOF)=referencePoint->accelerations[i];
 		}                
     }
 
 	void PlatformComputedTorqueController::imuCB(const sensor_msgs::Imu::ConstPtr &imu_data)
 	{
-		quatp_(0) = imu_data->orientation.x;
-		quatp_(1) = imu_data->orientation.y;
-		quatp_(2) = imu_data->orientation.z;
-		quatp_(3) = imu_data->orientation.w;
+		quatp_(0) = 0.0; //imu_data->orientation.x;
+		quatp_(1) = 0.0; //imu_data->orientation.y;
+		quatp_(2) = 0.0; //imu_data->orientation.z;
+		quatp_(3) = 1.0; //imu_data->orientation.w;
 		      
-        dqp_(0) = imu_data->angular_velocity.x;
-		dqp_(1) = imu_data->angular_velocity.y;
-		dqp_(2) = imu_data->angular_velocity.z;
+        dqp_(0) = 0.0; //imu_data->angular_velocity.x;
+		dqp_(1) = 0.0; //imu_data->angular_velocity.y;
+		dqp_(2) = 0.0; //imu_data->angular_velocity.z;
 
-		// // TODO convert to angular acceleration
-        ddqp_(0) = imu_data->linear_acceleration.x;
-		ddqp_(1) = imu_data->linear_acceleration.y;
-		ddqp_(2) = imu_data->linear_acceleration.z;
+		// TODO convert to angular acceleration
+        ddqp_(0) = 0.0; //imu_data->linear_acceleration.x;
+		ddqp_(1) = 0.0; //imu_data->linear_acceleration.y;
+		ddqp_(2) = 0.0; //imu_data->linear_acceleration.z;
 		KDL::Rotation::Quaternion(quatp_(0),quatp_(1),quatp_(2),quatp_(3)).GetRPY(
 			qp_(2),qp_(0),qp_(1));
+
 	}
+
 }
 
 PLUGINLIB_EXPORT_CLASS(effort_controllers::PlatformComputedTorqueController,
