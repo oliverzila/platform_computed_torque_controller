@@ -193,7 +193,7 @@ namespace effort_controllers
         //     ddqp_(i) = imu_handle_.getLinearAcceleration()[i];
         // }
 		// KDL::Rotation::Quaternion(quatp_(0),quatp_(1),quatp_(2),quatp_(3)).GetRPY(
-		// qp_(2),qp_(0),qp_(1));
+		// qp_(1),qp_(0),qp_(2));
 
 		// robot joints initial condition
 		for(unsigned int i=0;i < nJoints_;i++)
@@ -243,7 +243,7 @@ namespace effort_controllers
         //     ddqp_(i) = imu_handle_.getLinearAcceleration()[i];
         // }
 		// KDL::Rotation::Quaternion(quatp_(0),quatp_(1),quatp_(2),quatp_(3)).GetRPY(
-		// 	qp_(2),qp_(0),qp_(1));
+		// 	qp_(1),qp_(0),qp_(2));
 
 		// Get robot joints state
 		for(unsigned int i=0;i < nJoints_;i++)
