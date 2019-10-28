@@ -157,8 +157,6 @@ namespace effort_controllers
 			return false;
 		}
 
-		//chain_platform_.addChain(chain_);
-
         KDL::Vector g;
         node_.param("gravity/x",g[0],0.0);
         node_.param("gravity/y",g[1],0.0);
