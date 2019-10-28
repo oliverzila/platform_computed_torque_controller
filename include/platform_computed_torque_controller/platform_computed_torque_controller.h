@@ -42,7 +42,6 @@ namespace effort_controllers
 
         KDL::Tree tree_;
         KDL::Chain chain_;
-        KDL::Chain chain_platform_;
         KDL::ChainIdSolver_RNE *idsolver_;
 
         KDL::JntArray q_;

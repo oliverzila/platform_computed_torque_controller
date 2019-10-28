@@ -65,6 +65,7 @@ namespace effort_controllers
 	    	}
 	    }
 		std::cout<<"Size joints_: "<<joints_.size()<<std::endl;
+
 		// std::string imu_name;
 		// if(!node_.getParam("imu_name",imu_name))
         // {
@@ -103,40 +104,16 @@ namespace effort_controllers
             ROS_ERROR("KDL tree failed to construct");
             return false;
         }
-
-		std::string chainRoot;
-		if(!node_.getParam("chain/root",chainRoot))
-		{
-			ROS_ERROR("Could not find 'chain_root' parameter.");
-			return false;
-		}
 		
+		//robot chain tip
 		std::string chainTip;
 		if(!node_.getParam("chain/tip",chainTip))
 		{
 			ROS_ERROR("Could not find 'chain/tip' parameter.");
 			return false;
 		}
-		
-		if (!tree_.getChain(chainRoot,chainTip,chain_)) 
-		{
-			ROS_ERROR("Failed to get chain from KDL tree.");
-			return false;
-		}
 
-		// chain_platform_ = KDL::Chain();
-		// KDL::Joint joint1_(KDL::Joint::None); // inertial ref and platform
-		// KDL::Frame frame1_ = KDL::Frame(KDL::Vector(0.0, 0.0, 0.0));
-		// chain_platform_.addSegment(KDL::Segment(joint1_,frame1_));
-
-		// KDL::Joint joint_pitch_(KDL::Joint::RotY); // pitch joint
-		// KDL::Frame frame_pitch_ = KDL::Frame(KDL::Vector(0.0, 0.0, 0.0));
-		// chain_platform_.addSegment(KDL::Segment(joint_pitch_,frame_pitch_));
-		
-		// KDL::Joint joint_roll_(KDL::Joint::RotX); // roll joint
-		// KDL::Frame frame_roll_ = KDL::Frame(KDL::Vector(0.0, 0.0, 0.0));
-		// chain_platform_.addSegment(KDL::Segment(joint_roll_,frame_roll_));
-
+		//platform root
 		std::string platformRoot;
 		if(!node_.getParam("platform_chain/root",platformRoot))
 		{
@@ -144,16 +121,10 @@ namespace effort_controllers
 			return false;
 		}
 		
-		std::string platformTip;
-		if(!node_.getParam("platform_chain/tip",platformTip))
+		//kinematic chain built with platform + robot
+		if (!tree_.getChain(platformRoot,chainTip,chain_)) 
 		{
 			ROS_ERROR("Could not find 'chain/tip' parameter.");
-			return false;
-		}
-		
-		if (!tree_.getChain(platformRoot,chainTip,chain_platform_)) 
-		{
-			ROS_ERROR("Failed to get chain from KDL tree.");
 			return false;
 		}
 
@@ -162,12 +133,12 @@ namespace effort_controllers
         node_.param("gravity/y",g[1],0.0);
         node_.param("gravity/z",g[2],-9.8);
         
-        if((idsolver_=new::KDL::ChainIdSolver_RNE(chain_platform_,g))==NULL)
+        if((idsolver_=new::KDL::ChainIdSolver_RNE(chain_,g))==NULL)
         {
             ROS_ERROR("Failed to create ChainIDSolver_RNE.");
             return false;
         }
-		
+
 		nJointsVirt_ = nJoints_+DOF;
 		q_.resize(nJointsVirt_);
 		dq_.resize(nJointsVirt_);
@@ -176,7 +147,7 @@ namespace effort_controllers
 		dqr_.resize(nJointsVirt_);
 		ddqr_.resize(nJointsVirt_);
 		torque_.resize(nJointsVirt_);
-        fext_.resize(chain_platform_.getNrOfSegments());
+        fext_.resize(chain_.getNrOfSegments());
 
 		quatp_.resize(4);
         qp_.resize(DOF);
@@ -205,7 +176,7 @@ namespace effort_controllers
 		KpVirt_ = Eigen::MatrixXd::Zero(nJointsVirt_, nJointsVirt_);
 		KpVirt_.bottomRightCorner(nJoints_,nJoints_) = Kp_;
 		KdVirt_ = Eigen::MatrixXd::Zero(nJointsVirt_, nJointsVirt_);
-		KpVirt_.bottomRightCorner(nJoints_,nJoints_) = Kd_;
+		KdVirt_.bottomRightCorner(nJoints_,nJoints_) = Kd_;
 
 		return true;
 	}
@@ -280,24 +251,20 @@ namespace effort_controllers
 			q_(i+DOF)=joints_[i].getPosition();
 			dq_(i+DOF)=joints_[i].getVelocity();
 		}
-		// Get platform orientation
-		for(unsigned int i=0;i < DOF;i++)
-		{
-			q_(i)=qp_(i);
-			dq_(i)=dqp_(i);
 
-			qr_(i)=q_(i);
-			dqr_(i)=dq_(i);
-		}
 		for(unsigned int i=0;i < fext_.size();i++) fext_[i].Zero();
 
 		v_.data=ddqr_.data+KpVirt_*(qr_.data-q_.data)+KdVirt_*(dqr_.data-dq_.data);
-		std::cout<<"Segmentos: "<<chain_platform_.getNrOfSegments()<<std::endl;
-		std::cout<<"Juntas: "<<chain_platform_.getNrOfJoints()<<std::endl;
+		std::cout<<"|--------------------------------------------|"<<std::endl;
+		std::cout<<"Segmentos: "<<chain_.getNrOfSegments()<<std::endl;
+		std::cout<<"Juntas: "<<chain_.getNrOfJoints()<<std::endl;
 		if(idsolver_->CartToJnt(q_,dq_,v_,fext_,torque_) < 0)
 		        ROS_ERROR("KDL inverse dynamics solver failed.");
 		for(int i=0;i<nJointsVirt_;i++)
-			std::cout<<"qr: "<<qr_(i)<<"q"<<i<<": "<<q_(i)<<" dq"<<i<<": "<<dq_(i)<<" v_"<<i<<": "<<v_(i)<<" torque"<<i<<": "<<torque_(i)<<std::endl;
+		{
+			std::cout<<" q"<<i<<": "<<q_(i)<<" dq"<<i<<": "<<dq_(i)<<" v_"<<i<<": "<<v_(i)<<" torque"<<i<<": "<<torque_(i)<<std::endl;
+			std::cout<<" qr"<<i<<": "<<qr_(i)<<" dqr"<<i<<": "<<dqr_(i)<<std::endl;
+		}
 		for(unsigned int i=0;i < nJoints_;i++)
 		        joints_[i].setCommand(torque_(i+DOF));
 	}
@@ -317,22 +284,27 @@ namespace effort_controllers
 
 	void PlatformComputedTorqueController::imuCB(const sensor_msgs::Imu::ConstPtr &imu_data)
 	{
-		quatp_(0) = 0.0; //imu_data->orientation.x;
-		quatp_(1) = 0.0; //imu_data->orientation.y;
-		quatp_(2) = 0.0; //imu_data->orientation.z;
-		quatp_(3) = 1.0; //imu_data->orientation.w;
+		quatp_(0) = imu_data->orientation.x;
+		quatp_(1) = imu_data->orientation.y;
+		quatp_(2) = imu_data->orientation.z;
+		quatp_(3) = imu_data->orientation.w;
 		      
-        dqp_(0) = 0.0; //imu_data->angular_velocity.x;
-		dqp_(1) = 0.0; //imu_data->angular_velocity.y;
-		dqp_(2) = 0.0; //imu_data->angular_velocity.z;
+        dqp_(0) = imu_data->angular_velocity.x;
+		dqp_(1) = imu_data->angular_velocity.y;
+		dqp_(2) = imu_data->angular_velocity.z;
 
-		// TODO convert to angular acceleration
-        ddqp_(0) = 0.0; //imu_data->linear_acceleration.x;
-		ddqp_(1) = 0.0; //imu_data->linear_acceleration.y;
-		ddqp_(2) = 0.0; //imu_data->linear_acceleration.z;
 		KDL::Rotation::Quaternion(quatp_(0),quatp_(1),quatp_(2),quatp_(3)).GetRPY(
 			qp_(2),qp_(0),qp_(1));
 
+		// platform orientation
+		for(unsigned int i=0;i < DOF;i++)
+		{
+			q_(i)=qp_(i);
+			dq_(i)=dqp_(i);
+
+			qr_(i)=q_(i);
+			dqr_(i)=dq_(i);
+		}
 	}
 
 }
