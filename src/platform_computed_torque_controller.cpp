@@ -90,7 +90,7 @@ namespace effort_controllers
 
 		// IMU Topic
         sub_imu_ = node_.subscribe("imu/data", 1,
-                    &PlatformComputedTorqueController::imuCB, this);		
+                    &PlatformComputedTorqueController::imuCB, this);
         
         std::string robot_desc_string;
         if(!node_.getParam("/robot_description", robot_desc_string))
@@ -121,7 +121,7 @@ namespace effort_controllers
 			return false;
 		}
 		
-		//kinematic chain built with platform + robot
+		//platform + robot chain
 		if (!tree_.getChain(platformRoot,chainTip,chain_)) 
 		{
 			ROS_ERROR("Could not find 'chain/tip' parameter.");
@@ -256,6 +256,7 @@ namespace effort_controllers
 
 		v_.data=ddqr_.data+KpVirt_*(qr_.data-q_.data)+KdVirt_*(dqr_.data-dq_.data);
 		std::cout<<"|--------------------------------------------|"<<std::endl;
+		std::cout<<"Time: "<<ros::Time::now().toSec()<<std::endl;
 		std::cout<<"Segmentos: "<<chain_.getNrOfSegments()<<std::endl;
 		std::cout<<"Juntas: "<<chain_.getNrOfJoints()<<std::endl;
 		if(idsolver_->CartToJnt(q_,dq_,v_,fext_,torque_) < 0)
@@ -294,7 +295,7 @@ namespace effort_controllers
 		dqp_(2) = imu_data->angular_velocity.z;
 
 		KDL::Rotation::Quaternion(quatp_(0),quatp_(1),quatp_(2),quatp_(3)).GetRPY(
-			qp_(2),qp_(0),qp_(1));
+			qp_(1),qp_(0),qp_(2));
 
 		// platform orientation
 		for(unsigned int i=0;i < DOF;i++)
