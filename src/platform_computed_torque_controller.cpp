@@ -147,6 +147,7 @@ namespace effort_controllers
 		dqr_.resize(nJointsVirt_);
 		ddqr_.resize(nJointsVirt_);
 		torque_.resize(nJointsVirt_);
+		qe_int_.resize(nJointsVirt_);
         fext_.resize(chain_.getNrOfSegments());
 
 		quatp_.resize(4);
@@ -155,7 +156,8 @@ namespace effort_controllers
         ddqp_.resize(DOF);
 		
 		Kp_.resize(nJoints_,nJoints_);
-		Kd_.resize(nJoints_,nJoints_);        
+		Kd_.resize(nJoints_,nJoints_);
+		Ki_.resize(nJoints_,nJoints_);
 
 		std::vector<double> KpVec;
 		if(!node_.getParam("Kp",KpVec))
@@ -172,11 +174,21 @@ namespace effort_controllers
 			return false;
 		}
 		Kd_=Eigen::Map<Eigen::MatrixXd>(KdVec.data(),nJoints_,nJoints_).transpose();
+
+		std::vector<double> KiVec;
+		if(!node_.getParam("Ki",KiVec))
+		{
+			ROS_ERROR("No 'Ki' in controller %s.",node_.getNamespace().c_str());
+			return false;
+		}
+		Ki_=Eigen::Map<Eigen::MatrixXd>(KiVec.data(),nJoints_,nJoints_).transpose();
 		
 		KpVirt_ = Eigen::MatrixXd::Zero(nJointsVirt_, nJointsVirt_);
 		KpVirt_.bottomRightCorner(nJoints_,nJoints_) = Kp_;
 		KdVirt_ = Eigen::MatrixXd::Zero(nJointsVirt_, nJointsVirt_);
 		KdVirt_.bottomRightCorner(nJoints_,nJoints_) = Kd_;
+		KiVirt_ = Eigen::MatrixXd::Zero(nJointsVirt_, nJointsVirt_);
+		KiVirt_.bottomRightCorner(nJoints_,nJoints_) = Ki_;
 
 		return true;
 	}
@@ -214,6 +226,8 @@ namespace effort_controllers
 			dqr_(i)=dq_(i);
 		}
 		SetToZero(ddqr_);
+
+		last_time = ros::Time::now().toSec();
 		
 		struct sched_param param;
 		if(!node_.getParam("priority",param.sched_priority))
@@ -253,8 +267,9 @@ namespace effort_controllers
 		}
 
 		for(unsigned int i=0;i < fext_.size();i++) fext_[i].Zero();
-
-		v_.data=ddqr_.data+KpVirt_*(qr_.data-q_.data)+KdVirt_*(dqr_.data-dq_.data);
+		now_time = ros::Time::now().toSec();
+		qe_int_.data+=(qr_.data-q_.data)*(now_time-last_time);
+		v_.data=ddqr_.data+KpVirt_*(qr_.data-q_.data)+KdVirt_*(dqr_.data-dq_.data)+KiVirt_*qe_int_.data;
 		std::cout<<"|--------------------------------------------|"<<std::endl;
 		std::cout<<"Time: "<<ros::Time::now().toSec()<<std::endl;
 		std::cout<<"Segmentos: "<<chain_.getNrOfSegments()<<std::endl;
@@ -268,6 +283,8 @@ namespace effort_controllers
 		}
 		for(unsigned int i=0;i < nJoints_;i++)
 		        joints_[i].setCommand(torque_(i+DOF));
+		
+		last_time=now_time;
 	}
 
 

@@ -50,9 +50,9 @@ namespace effort_controllers
         KDL::JntArray qr_;
 		KDL::JntArray dqr_;
 		KDL::JntArray ddqr_;
+        KDL::JntArray qe_int_;
 
         //Platform angles: qp_(0)=pitch qp_(1)=roll
-        // remember to get quaternion from orientation and convert to roll and pitch
         KDL::JntArray quatp_;
         KDL::JntArray qp_;
         KDL::JntArray dqp_;
@@ -63,9 +63,14 @@ namespace effort_controllers
 			
 		Eigen::MatrixXd Kp_;
 		Eigen::MatrixXd Kd_;
+        Eigen::MatrixXd Ki_;
 
         Eigen::MatrixXd KpVirt_;
         Eigen::MatrixXd KdVirt_;
+        Eigen::MatrixXd KiVirt_; 
+
+        double now_time;
+        double last_time;
 
         void commandCB(const trajectory_msgs::JointTrajectoryPoint::
         ConstPtr &reference);
