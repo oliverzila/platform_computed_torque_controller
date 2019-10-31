@@ -64,7 +64,6 @@ namespace effort_controllers
 	    		return false;
 	    	}
 	    }
-		std::cout<<"Size joints_: "<<joints_.size()<<std::endl;
 
 		// std::string imu_name;
 		// if(!node_.getParam("imu_name",imu_name))
@@ -211,7 +210,6 @@ namespace effort_controllers
 		for(unsigned int i=0;i < nJoints_;i++)
 		{
 			q_(i+DOF)=joints_[i].getPosition();
-			std::cout<<"Posicao inicial junta "<<i<<": "<<q_(i+DOF)<<std::endl;
 			dq_(i+DOF)=joints_[i].getVelocity();
 			qr_(i+DOF)=q_(i+DOF);
 			dqr_(i+DOF)=dq_(i+DOF);
@@ -270,17 +268,8 @@ namespace effort_controllers
 		now_time = ros::Time::now().toSec();
 		qe_int_.data+=(qr_.data-q_.data)*(now_time-last_time);
 		v_.data=ddqr_.data+KpVirt_*(qr_.data-q_.data)+KdVirt_*(dqr_.data-dq_.data)+KiVirt_*qe_int_.data;
-		std::cout<<"|--------------------------------------------|"<<std::endl;
-		std::cout<<"Time: "<<ros::Time::now().toSec()<<std::endl;
-		std::cout<<"Segmentos: "<<chain_.getNrOfSegments()<<std::endl;
-		std::cout<<"Juntas: "<<chain_.getNrOfJoints()<<std::endl;
 		if(idsolver_->CartToJnt(q_,dq_,v_,fext_,torque_) < 0)
 		        ROS_ERROR("KDL inverse dynamics solver failed.");
-		for(int i=0;i<nJointsVirt_;i++)
-		{
-			std::cout<<" q"<<i<<": "<<q_(i)<<" dq"<<i<<": "<<dq_(i)<<" v_"<<i<<": "<<v_(i)<<" torque"<<i<<": "<<torque_(i)<<std::endl;
-			std::cout<<" qr"<<i<<": "<<qr_(i)<<" dqr"<<i<<": "<<dqr_(i)<<std::endl;
-		}
 		for(unsigned int i=0;i < nJoints_;i++)
 		        joints_[i].setCommand(torque_(i+DOF));
 		
