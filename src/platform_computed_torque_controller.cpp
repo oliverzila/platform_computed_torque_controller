@@ -303,7 +303,7 @@ namespace effort_controllers
 		KDL::Rotation::Quaternion(quatp_(0),quatp_(1),quatp_(2),quatp_(3)).GetRPY(
 			qp_(1),qp_(0),qp_(2));
 
-		// platform orientation
+		// platform orientation as joint angles
 		for(unsigned int i=0;i < DOF;i++)
 		{
 			q_(i)=qp_(i);
