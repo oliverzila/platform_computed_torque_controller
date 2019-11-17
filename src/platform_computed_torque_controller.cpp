@@ -97,7 +97,7 @@ namespace effort_controllers
             ROS_ERROR("Could not find /'robot_description'.");
             return false;
         }
-
+		
         if(!kdl_parser::treeFromString(robot_desc_string, tree_))
         {
             ROS_ERROR("KDL tree failed to construct");
@@ -150,13 +150,46 @@ namespace effort_controllers
         fext_.resize(chain_.getNrOfSegments());
 
 		quatp_.resize(4);
-        qp_.resize(DOF);
-        dqp_.resize(DOF);
+        qp_.resize(3);
+        dqp_.resize(3);
         ddqp_.resize(DOF);
 		
 		Kp_.resize(nJoints_,nJoints_);
 		Kd_.resize(nJoints_,nJoints_);
 		Ki_.resize(nJoints_,nJoints_);
+
+		// Imu orientation
+		imu_mount_.resize(3);
+		Rimu_.resize(3,3);
+		qpR_.resize(3);
+		dqpR_.resize(3);
+
+		// TODO parse from urdf instead of getting from param server
+		if(!node_.getParam("imu_chain/roll",imu_mount_(0)))
+		{
+			ROS_WARN("No roll defined for imu, assuming zero");
+			imu_mount_(0)=0.0;
+		}
+		if(!node_.getParam("imu_chain/pitch",imu_mount_(1)))
+		{
+			ROS_WARN("No pitch defined for imu, assuming zero");
+			imu_mount_(1)=0.0;
+		}
+		if(!node_.getParam("imu_chain/yaw",imu_mount_(2)))
+		{
+			ROS_WARN("No yaw defined for imu, assuming zero");
+			imu_mount_(2)=0.0;
+		}
+		rotImu_=KDL::Rotation::RPY(imu_mount_(0),imu_mount_(1),imu_mount_(2));
+		Rimu_<< rotImu_.data[0], rotImu_.data[1], rotImu_.data[2],
+				rotImu_.data[3], rotImu_.data[4], rotImu_.data[5],
+				rotImu_.data[6], rotImu_.data[7], rotImu_.data[8];
+		std::cout<<Rimu_<<std::endl;
+		std::cout<<"Roll: "<<imu_mount_(0)<<std::endl;
+		std::cout<<"Pitch: "<<imu_mount_(1)<<std::endl;
+		std::cout<<"Yaw: "<<imu_mount_(2)<<std::endl;
+
+		// end Imu
 
 		std::vector<double> KpVec;
 		if(!node_.getParam("Kp",KpVec))
@@ -274,6 +307,12 @@ namespace effort_controllers
 		        joints_[i].setCommand(torque_(i+DOF));
 		
 		last_time=now_time;
+		/* ----TESTES IMU---- */
+		std::cout<<"|-----------------------------------------|"<<std::endl;
+		std::cout<<"Roll: "<<qp_(1)<<" Pitch: "<<qp_(0)<<" Yaw: "<<qp_(2)<<std::endl;
+		std::cout<<"Rimu: \n"<<Rimu_<<std::endl;
+		std::cout<<"Corrigidos: "<<std::endl;
+		std::cout<<"Roll: "<<qpR_(1)<<" Pitch: "<<qpR_(0)<<" Yaw: "<<qpR_(2)<<std::endl;
 	}
 
 
@@ -303,6 +342,8 @@ namespace effort_controllers
 		KDL::Rotation::Quaternion(quatp_(0),quatp_(1),quatp_(2),quatp_(3)).GetRPY(
 			qp_(1),qp_(0),qp_(2));
 
+		qpR_.data=Rimu_.transpose()*qp_.data;
+		dqpR_.data=Rimu_.transpose()*dqp_.data;
 		// platform orientation as joint angles
 		for(unsigned int i=0;i < DOF;i++)
 		{

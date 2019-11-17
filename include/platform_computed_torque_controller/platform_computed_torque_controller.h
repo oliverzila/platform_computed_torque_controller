@@ -52,6 +52,11 @@ namespace effort_controllers
 		KDL::JntArray ddqr_;
         KDL::JntArray qe_int_;
 
+        KDL::JntArray imu_mount_;
+        Eigen::MatrixXd Rimu_;
+        KDL::Rotation rotImu_;
+        KDL::JntArray qpR_;
+        KDL::JntArray dqpR_;
         //Platform angles: qp_(0)=pitch qp_(1)=roll
         KDL::JntArray quatp_;
         KDL::JntArray qp_;
