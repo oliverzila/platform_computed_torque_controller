@@ -155,7 +155,7 @@ namespace effort_controllers
         node_.param("gravity/x",g[0],0.0);
         node_.param("gravity/y",g[1],0.0);
         node_.param("gravity/z",g[2],-9.8);
-		mVectorEigen(g,gravityV);
+		mVectorEigen(g,gravity_v_);
         
         if((idsolver_=new::KDL::ChainIdSolver_RNE(chain_,g))==NULL)
         {
@@ -178,12 +178,14 @@ namespace effort_controllers
         qp_.resize(3);
         dqp_.resize(3);
         ddqp_.resize(3);
-		imu_joint_rpy_.resize(3);
-		Wimu_imu.resize(3);
-		Aimu_imu.resize(3);
+		
+		w_imu_imu.resize(3);
+		a_imu_imu.resize(3);
 
 		// TODO parse from urdf instead of getting from param server
 		// Imu -> Platform top
+		KDL::JntArray imu_joint_rpy_;
+		imu_joint_rpy_.resize(3);
 		if(!node_.getParam("imu_joint/roll",imu_joint_rpy_(0)))
 		{
 			ROS_WARN("No roll defined for imu, assuming zero");
@@ -199,9 +201,9 @@ namespace effort_controllers
 			ROS_WARN("No yaw defined for imu, assuming zero");
 			imu_joint_rpy_(2)=0.0;
 		}
-		Rimu_t=KDL::Rotation::RPY(imu_joint_rpy_(0),
+		r_imu_t_=KDL::Rotation::RPY(imu_joint_rpy_(0),
 		imu_joint_rpy_(1),imu_joint_rpy_(2));
-		mRotation2Matrix(Rimu_t, mRimu_t);
+		mRotation2Matrix(r_imu_t_, mr_imu_t_);
 		// Enu -> World
 		if(!node_.getParam("enu_world/roll",imu_joint_rpy_(0)))
 		{
@@ -218,9 +220,9 @@ namespace effort_controllers
 			ROS_WARN("No yaw defined for imu, assuming zero");
 			imu_joint_rpy_(2)=0.0;
 		}
-		Renu_0=KDL::Rotation::RPY(imu_joint_rpy_(0),
+		r_enu_0_=KDL::Rotation::RPY(imu_joint_rpy_(0),
 		imu_joint_rpy_(1),imu_joint_rpy_(2));
-		mRotation2Matrix(Renu_0,mRenu_0);
+		mRotation2Matrix(r_enu_0_,mr_enu_0_);
 		// Platform -> Enu
 		if(!node_.getParam("platform_enu/roll",imu_joint_rpy_(0)))
 		{
@@ -237,9 +239,8 @@ namespace effort_controllers
 			ROS_WARN("No yaw defined for imu, assuming zero");
 			imu_joint_rpy_(2)=0.0;
 		}
-		Rp_enu=KDL::Rotation::RPY(imu_joint_rpy_(0),
+		r_p_enu_=KDL::Rotation::RPY(imu_joint_rpy_(0),
 		imu_joint_rpy_(1),imu_joint_rpy_(2));
-		mRotation2Matrix(Rp_enu, mRp_enu);
 		// remaining parameters
 		if(!node_.getParam("platform_imu_top/x",Pimu_t(0)))
 		{
@@ -379,7 +380,6 @@ namespace effort_controllers
 		std::cout<<"Roll: "<<qp_(0)<<" Pitch: "<<qp_(1)<<" Yaw: "<<qp_(2)<<std::endl;
 		std::cout<<"Wx: "<<dqp_(0)<<" Wy: "<<dqp_(1)<<" Wz: "<<dqp_(2)<<std::endl;
 		std::cout<<"NU: \n"<<v_(0)<<"  "<<v_(1)<<std::endl;
-		std::cout<<"Rot plat: \n"<<mRt_p<<std::endl;
 
 	}
 
@@ -404,31 +404,37 @@ namespace effort_controllers
 		quatp_(2) = imu_data->orientation.z;
 		quatp_(3) = imu_data->orientation.w;
 		      
-        Wimu_imu(0) = imu_data->angular_velocity.x;
-		Wimu_imu(1) = imu_data->angular_velocity.y;
-		Wimu_imu(2) = imu_data->angular_velocity.z;
+        w_imu_imu(0) = imu_data->angular_velocity.x;
+		w_imu_imu(1) = imu_data->angular_velocity.y;
+		w_imu_imu(2) = imu_data->angular_velocity.z;
 
-		Aimu_imu(0) = imu_data->linear_acceleration.x;
-		Aimu_imu(1) = imu_data->linear_acceleration.y;
-		Aimu_imu(2) = imu_data->linear_acceleration.z;
+		a_imu_imu(0) = imu_data->linear_acceleration.x;
+		a_imu_imu(1) = imu_data->linear_acceleration.y;
+		a_imu_imu(2) = imu_data->linear_acceleration.z;
 
 		// oreintation calculation
-		Rimu_enu = KDL::Rotation::Quaternion(quatp_(0),quatp_(1),quatp_(2),quatp_(3));
-		mRotation2Matrix(Rimu_enu, mRimu_enu);
-		Rt_p = Rp_enu*Rimu_enu*Rimu_t.Inverse();
-		mRotation2Matrix(Rt_p,mRt_p);
+		Eigen::MatrixXd mr_imu_enu;
+		KDL::Rotation r_imu_enu = KDL::Rotation::Quaternion(quatp_(0),quatp_(1),quatp_(2),quatp_(3));
+		mRotation2Matrix(r_imu_enu, mr_imu_enu);
+		KDL::Rotation r_t_p = r_p_enu_*r_imu_enu*r_imu_t_.Inverse();
+
+
+        Eigen::MatrixXd mr_t_p;
+		mRotation2Matrix(r_t_p,mr_t_p);
 		// platform orientation as joint angles
-		Rt_p.GetRPY(qp_(0),qp_(1),qp_(2));
-		// qp_(0)= std::atan2(-Rt_p(2,1),Rt_p(1,1)); //atan2(-Rt_p(3,2),Rt_p(2,2))
-		// qp_(1)= std::atan2(-Rt_p(0,2),Rt_p(0,0)); //atan2(-Rt_p(1,3),Rt_p(1,1))
+		r_t_p.GetRPY(qp_(0),qp_(1),qp_(2));
+		// qp_(0)= std::atan2(-r_t_p(2,1),r_t_p(1,1)); //atan2(-r_t_p(3,2),r_t_p(2,2))
+		// qp_(1)= std::atan2(-r_t_p(0,2),r_t_p(0,0)); //atan2(-r_t_p(1,3),r_t_p(1,1))
 		// angular velocity calculation
-		wJacobian(qp_, wJac_);
-		dqp_.data = wJac_.transpose()*mRt_p*mRimu_t*Wimu_imu.data;
+		Eigen::MatrixXd w_jac_;
+		wJacobian(qp_, w_jac_);
+		dqp_.data = w_jac_.transpose()*mr_t_p*mr_imu_t_*w_imu_imu.data;
 		// angular acceleration calculation
-		vJacobian(qp_, vJac_);
+        Eigen::MatrixXd v_jac_;
+		vJacobian(qp_, v_jac_);
 		vJacobianDot(qp_, dqp_, vJacDot_);
 		pseudoInv(vJacDot_, vJacInv_);
-		//ddqp_.data = vJacInv_*(mRt_p*mRimu_t*(Aimu_imu.data+mRenu_0*mRimu_enu*gravityV)-vJacDot_*dqp_.data);
+		//ddqp_.data = vJacInv_*(mr_t_p*mr_imu_t_*(a_imu_imu.data+mr_enu_0_*mr_imu_enu*gravity_v_)-vJacDot_*dqp_.data);
 		for(unsigned int i=0;i < DOF;i++)
 		{
 			q_(i)= qp_(i);

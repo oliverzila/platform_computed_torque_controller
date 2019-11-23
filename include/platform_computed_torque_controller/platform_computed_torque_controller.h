@@ -58,26 +58,19 @@ namespace effort_controllers
         KDL::JntArray qp_;
         KDL::JntArray dqp_;
         KDL::JntArray ddqp_;
-        // Notation Ra_b = ^{b}R_{a}
-        KDL::Rotation Rimu_enu; //sensor orientation estimate
-        Eigen::MatrixXd mRimu_enu;
-        KDL::Rotation Rimu_t;
-        Eigen::MatrixXd mRimu_t;
-        KDL::JntArray imu_joint_rpy_;
-        KDL::Rotation Rp_enu;
-        Eigen::MatrixXd mRp_enu;
-        KDL::Rotation Rt_p;
-        Eigen::MatrixXd mRt_p;
-        KDL::JntArray Wimu_imu; // sensor angular rate measure
-        KDL::JntArray Aimu_imu; // sensor linear acceleration measure
-        Eigen::MatrixXd wJac_;
-        Eigen::MatrixXd vJac_;
+        // Notation r_a_b = ^{b}R_{a}
+        KDL::Rotation r_imu_t_;
+        Eigen::MatrixXd mr_imu_t_;
+        KDL::Rotation r_p_enu_;
+        KDL::JntArray w_imu_imu; // sensor angular rate measure
+        KDL::JntArray a_imu_imu; // sensor linear acceleration measure
+        
         Eigen::MatrixXd vJacInv_;
         Eigen::MatrixXd vJacDot_;
-        KDL::Rotation Renu_0;
-        Eigen::MatrixXd mRenu_0;
+        KDL::Rotation r_enu_0_;
+        Eigen::MatrixXd mr_enu_0_;
 		
-        Eigen::VectorXd gravityV;
+        Eigen::VectorXd gravity_v_;
         KDL::Vector Pt_p;
         KDL::Vector Pimu_t;
 
