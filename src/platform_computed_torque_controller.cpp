@@ -97,7 +97,7 @@ namespace effort_controllers
             ROS_ERROR("Could not find /'robot_description'.");
             return false;
         }
-		
+
         if(!kdl_parser::treeFromString(robot_desc_string, tree_))
         {
             ROS_ERROR("KDL tree failed to construct");
@@ -127,10 +127,35 @@ namespace effort_controllers
 			return false;
 		}
 
+		
+		//IMU PLATFORM - TOP
+		std::string imuTip;
+		if(!node_.getParam("chain/tip",imuTip))
+		{
+			ROS_ERROR("Could not find 'chain/tip' parameter.");
+			return false;
+		}
+
+		//platform top
+		std::string platformTop;
+		if(!node_.getParam("imu_top_chain/root",platformTop))
+		{
+			ROS_ERROR("Could not find 'platform_root' parameter.");
+			return false;
+		}
+		
+		//platform top + imu
+		if (!tree_.getChain(platformTop,imuTip,imuChain_)) 
+		{
+			ROS_ERROR("Could not find 'chain/tip' parameter.");
+			return false;
+		}
+
         KDL::Vector g;
         node_.param("gravity/x",g[0],0.0);
         node_.param("gravity/y",g[1],0.0);
         node_.param("gravity/z",g[2],-9.8);
+		mVectorEigen(g,gravityV);
         
         if((idsolver_=new::KDL::ChainIdSolver_RNE(chain_,g))==NULL)
         {
@@ -152,7 +177,101 @@ namespace effort_controllers
 		quatp_.resize(4);
         qp_.resize(3);
         dqp_.resize(3);
-        ddqp_.resize(DOF);
+        ddqp_.resize(3);
+		imu_joint_rpy_.resize(3);
+		Wimu_imu.resize(3);
+		Aimu_imu.resize(3);
+
+		// TODO parse from urdf instead of getting from param server
+		// Imu -> Platform top
+		if(!node_.getParam("imu_joint/roll",imu_joint_rpy_(0)))
+		{
+			ROS_WARN("No roll defined for imu, assuming zero");
+			imu_joint_rpy_(0)=0.0;
+		}
+		if(!node_.getParam("imu_joint/pitch",imu_joint_rpy_(1)))
+		{
+			ROS_WARN("No pitch defined for imu, assuming zero");
+			imu_joint_rpy_(1)=0.0;
+		}
+		if(!node_.getParam("imu_joint/yaw",imu_joint_rpy_(2)))
+		{
+			ROS_WARN("No yaw defined for imu, assuming zero");
+			imu_joint_rpy_(2)=0.0;
+		}
+		Rimu_t=KDL::Rotation::RPY(imu_joint_rpy_(0),
+		imu_joint_rpy_(1),imu_joint_rpy_(2));
+		mRotation2Matrix(Rimu_t, mRimu_t);
+		// Enu -> World
+		if(!node_.getParam("enu_world/roll",imu_joint_rpy_(0)))
+		{
+			ROS_WARN("No enu_world/roll defined, assuming zero");
+			imu_joint_rpy_(0)=0.0;
+		}
+		if(!node_.getParam("enu_world/pitch",imu_joint_rpy_(1)))
+		{
+			ROS_WARN("No pitch defined for imu, assuming zero");
+			imu_joint_rpy_(1)=0.0;
+		}
+		if(!node_.getParam("enu_world/yaw",imu_joint_rpy_(2)))
+		{
+			ROS_WARN("No yaw defined for imu, assuming zero");
+			imu_joint_rpy_(2)=0.0;
+		}
+		Renu_0=KDL::Rotation::RPY(imu_joint_rpy_(0),
+		imu_joint_rpy_(1),imu_joint_rpy_(2));
+		mRotation2Matrix(Renu_0,mRenu_0);
+		// Platform -> Enu
+		if(!node_.getParam("platform_enu/roll",imu_joint_rpy_(0)))
+		{
+			ROS_WARN("No platform_enu/roll defined, assuming zero");
+			imu_joint_rpy_(0)=0.0;
+		}
+		if(!node_.getParam("platform_enu/pitch",imu_joint_rpy_(1)))
+		{
+			ROS_WARN("No pitch defined for imu, assuming zero");
+			imu_joint_rpy_(1)=0.0;
+		}
+		if(!node_.getParam("platform_enu/yaw",imu_joint_rpy_(2)))
+		{
+			ROS_WARN("No yaw defined for imu, assuming zero");
+			imu_joint_rpy_(2)=0.0;
+		}
+		Rp_enu=KDL::Rotation::RPY(imu_joint_rpy_(0),
+		imu_joint_rpy_(1),imu_joint_rpy_(2));
+		mRotation2Matrix(Rp_enu, mRp_enu);
+		// remaining parameters
+		if(!node_.getParam("platform_imu_top/x",Pimu_t(0)))
+		{
+			ROS_WARN("No platform_imu_top/x defined for imu, assuming zero");
+			Pimu_t(0)=0.0;
+		}
+		if(!node_.getParam("platform_imu_top/y",Pimu_t(1)))
+		{
+			ROS_WARN("No platform_imu_top/y defined for imu, assuming zero");
+			Pimu_t(1)=0.0;
+		}
+		if(!node_.getParam("platform_imu_top/z",Pimu_t(2)))
+		{
+			ROS_WARN("No platform_imu_top/x defined for imu, assuming zero");
+			Pimu_t(0)=0.0;
+		}
+
+		if(!node_.getParam("platform_top_base/x",Pt_p(0)))
+		{
+			ROS_WARN("No platform_top_base/x defined for imu, assuming zero");
+			Pt_p(0)=0.0;
+		}
+		if(!node_.getParam("platform_top_base/y",Pt_p(1)))
+		{
+			ROS_WARN("No platform_top_base/y defined for imu, assuming zero");
+			Pt_p(1)=0.0;
+		}
+		if(!node_.getParam("platform_top_base/z",Pt_p(2)))
+		{
+			ROS_WARN("No platform_top_base/x defined for imu, assuming zero");
+			Pt_p(0)=0.0;
+		}
 		
 		Kp_.resize(nJoints_,nJoints_);
 		Kd_.resize(nJoints_,nJoints_);
@@ -194,18 +313,6 @@ namespace effort_controllers
 
     void PlatformComputedTorqueController::starting(const ros::Time &time)
     {
-		// for (unsigned int i = 0; i < 3; i++)
-		// {
-		// 	quatp_(i) = imu_handle_.getOrientation()[i];
-		// }
-        // for(unsigned int i=0;i < 2;i++)
-        // {
-        //     dqp_(i) = imu_handle_.getAngularVelocity()[i];
-        //     ddqp_(i) = imu_handle_.getLinearAcceleration()[i];
-        // }
-		// KDL::Rotation::Quaternion(quatp_(0),quatp_(1),quatp_(2),quatp_(3)).GetRPY(
-		// qp_(1),qp_(0),qp_(2));
-
 		// robot joints initial condition
 		for(unsigned int i=0;i < nJoints_;i++)
 		{
@@ -245,18 +352,6 @@ namespace effort_controllers
     void PlatformComputedTorqueController::update(const ros::Time &time,
             const ros::Duration &duration)
     {
-		// for (unsigned int i = 0; i < 3; i++)
-		// {
-		// 	quatp_(i) = imu_handle_.getOrientation()[i];
-		// }
-        // for(unsigned int i=0;i < 2;i++)
-        // {
-        //     dqp_(i) = imu_handle_.getAngularVelocity()[i];
-        //     ddqp_(i) = imu_handle_.getLinearAcceleration()[i];
-        // }
-		// KDL::Rotation::Quaternion(quatp_(0),quatp_(1),quatp_(2),quatp_(3)).GetRPY(
-		// 	qp_(1),qp_(0),qp_(2));
-
 		// Get robot joints state
 		for(unsigned int i=0;i < nJoints_;i++)
 		{
@@ -265,9 +360,14 @@ namespace effort_controllers
 		}
 
 		for(unsigned int i=0;i < fext_.size();i++) fext_[i].Zero();
+
 		now_time = ros::Time::now().toSec();
+
 		qe_int_.data+=(qr_.data-q_.data)*(now_time-last_time);
 		v_.data=ddqr_.data+KpVirt_*(qr_.data-q_.data)+KdVirt_*(dqr_.data-dq_.data)+KiVirt_*qe_int_.data;
+
+		for (int i=0;i<DOF;i++)	v_(i)=0.0;//ddqp_(i); // platform joint accelerations
+
 		if(idsolver_->CartToJnt(q_,dq_,v_,fext_,torque_) < 0)
 		        ROS_ERROR("KDL inverse dynamics solver failed.");
 		for(unsigned int i=0;i < nJoints_;i++)
@@ -276,7 +376,10 @@ namespace effort_controllers
 		last_time=now_time;
 		/* ----TESTES IMU---- */
 		std::cout<<"|-----------------------------------------|"<<std::endl;
-		std::cout<<"Roll: "<<qp_(1)<<" Pitch: "<<qp_(0)<<" Yaw: "<<qp_(2)<<std::endl;
+		std::cout<<"Roll: "<<qp_(0)<<" Pitch: "<<qp_(1)<<" Yaw: "<<qp_(2)<<std::endl;
+		std::cout<<"Wx: "<<dqp_(0)<<" Wy: "<<dqp_(1)<<" Wz: "<<dqp_(2)<<std::endl;
+		std::cout<<"NU: \n"<<v_(0)<<"  "<<v_(1)<<std::endl;
+		std::cout<<"Rot plat: \n"<<mRt_p<<std::endl;
 
 	}
 
@@ -295,28 +398,87 @@ namespace effort_controllers
 
 	void PlatformComputedTorqueController::imuCB(const sensor_msgs::Imu::ConstPtr &imu_data)
 	{
+		// sensor reading
 		quatp_(0) = imu_data->orientation.x;
 		quatp_(1) = imu_data->orientation.y;
 		quatp_(2) = imu_data->orientation.z;
 		quatp_(3) = imu_data->orientation.w;
 		      
-        dqp_(0) = imu_data->angular_velocity.x;
-		dqp_(1) = imu_data->angular_velocity.y;
-		dqp_(2) = imu_data->angular_velocity.z;
+        Wimu_imu(0) = imu_data->angular_velocity.x;
+		Wimu_imu(1) = imu_data->angular_velocity.y;
+		Wimu_imu(2) = imu_data->angular_velocity.z;
 
-		KDL::Rotation::Quaternion(quatp_(0),quatp_(1),quatp_(2),quatp_(3)).GetRPY(
-			qp_(1),qp_(0),qp_(2));
+		Aimu_imu(0) = imu_data->linear_acceleration.x;
+		Aimu_imu(1) = imu_data->linear_acceleration.y;
+		Aimu_imu(2) = imu_data->linear_acceleration.z;
 
+		// oreintation calculation
+		Rimu_enu = KDL::Rotation::Quaternion(quatp_(0),quatp_(1),quatp_(2),quatp_(3));
+		mRotation2Matrix(Rimu_enu, mRimu_enu);
+		Rt_p = Rp_enu*Rimu_enu*Rimu_t.Inverse();
+		mRotation2Matrix(Rt_p,mRt_p);
 		// platform orientation as joint angles
+		Rt_p.GetRPY(qp_(0),qp_(1),qp_(2));
+		// qp_(0)= std::atan2(-Rt_p(2,1),Rt_p(1,1)); //atan2(-Rt_p(3,2),Rt_p(2,2))
+		// qp_(1)= std::atan2(-Rt_p(0,2),Rt_p(0,0)); //atan2(-Rt_p(1,3),Rt_p(1,1))
+		// angular velocity calculation
+		wJacobian(qp_, wJac_);
+		dqp_.data = wJac_.transpose()*mRt_p*mRimu_t*Wimu_imu.data;
+		// angular acceleration calculation
+		vJacobian(qp_, vJac_);
+		vJacobianDot(qp_, dqp_, vJacDot_);
+		pseudoInv(vJacDot_, vJacInv_);
+		//ddqp_.data = vJacInv_*(mRt_p*mRimu_t*(Aimu_imu.data+mRenu_0*mRimu_enu*gravityV)-vJacDot_*dqp_.data);
 		for(unsigned int i=0;i < DOF;i++)
 		{
-			q_(i)=qp_(i);
-			dq_(i)=dqp_(i);
-
+			q_(i)= qp_(i);
+			dq_(i)= dqp_(i);
+			
 			qr_(i)=q_(i);
 			dqr_(i)=dq_(i);
 		}
 	}
+
+	void PlatformComputedTorqueController::wJacobian(KDL::JntArray qp, Eigen::MatrixXd &wJac)
+	{ //TODO update
+		wJac = (Eigen::MatrixXd(3,2) << 
+		0.0, std::sin(qp(0)), 
+		0.0, -std::cos(qp(0)),
+		1.0, 0.0).finished();
+	}
+	void PlatformComputedTorqueController::vJacobian(KDL::JntArray qp, Eigen::MatrixXd &vJac)
+	{ //TODO update
+		vJac = (Eigen::MatrixXd(3,2) << 
+		1.0, 0.0, 
+		0.0, std::cos(qp(0)),
+		0.0, std::sin(qp(0))).finished();
+	}
+	void PlatformComputedTorqueController::vJacobianDot(KDL::JntArray qp, KDL::JntArray dqp, Eigen::MatrixXd &vdJac)
+	{ //TODO updade
+		vdJac = (Eigen::MatrixXd(3,2) << 
+		1.0, 0.0, 
+		0.0, std::cos(qp(0)),
+		0.0, std::sin(qp(0))).finished();
+	}
+	void PlatformComputedTorqueController::pseudoInv(Eigen::MatrixXd &Jac, Eigen::MatrixXd &invJac)
+	{
+		//invJac = ((Jac.transpose()*Jac).inverse())*Jac.transpose();
+	}
+	
+
+	void PlatformComputedTorqueController::mRotation2Matrix(KDL::Rotation rot, Eigen::MatrixXd &matrix)
+	{
+		matrix = (Eigen::MatrixXd(3,3) << 
+		rot.data[0], rot.data[1], rot.data[2], 
+		rot.data[3], rot.data[4], rot.data[5], 
+		rot.data[6], rot.data[7], rot.data[8]).finished();
+	}
+
+	void PlatformComputedTorqueController::mVectorEigen(KDL::Vector vec, Eigen::VectorXd &eigenV)
+	{
+		eigenV = (Eigen::VectorXd(3) << vec.data[0], vec.data[1], vec.data[2]).finished();
+	}
+
 
 }
 

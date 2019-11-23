@@ -42,6 +42,7 @@ namespace effort_controllers
 
         KDL::Tree tree_;
         KDL::Chain chain_;
+        KDL::Chain imuChain_;
         KDL::ChainIdSolver_RNE *idsolver_;
 
         KDL::JntArray q_;
@@ -57,7 +58,29 @@ namespace effort_controllers
         KDL::JntArray qp_;
         KDL::JntArray dqp_;
         KDL::JntArray ddqp_;
-			
+        // Notation Ra_b = ^{b}R_{a}
+        KDL::Rotation Rimu_enu; //sensor orientation estimate
+        Eigen::MatrixXd mRimu_enu;
+        KDL::Rotation Rimu_t;
+        Eigen::MatrixXd mRimu_t;
+        KDL::JntArray imu_joint_rpy_;
+        KDL::Rotation Rp_enu;
+        Eigen::MatrixXd mRp_enu;
+        KDL::Rotation Rt_p;
+        Eigen::MatrixXd mRt_p;
+        KDL::JntArray Wimu_imu; // sensor angular rate measure
+        KDL::JntArray Aimu_imu; // sensor linear acceleration measure
+        Eigen::MatrixXd wJac_;
+        Eigen::MatrixXd vJac_;
+        Eigen::MatrixXd vJacInv_;
+        Eigen::MatrixXd vJacDot_;
+        KDL::Rotation Renu_0;
+        Eigen::MatrixXd mRenu_0;
+		
+        Eigen::VectorXd gravityV;
+        KDL::Vector Pt_p;
+        KDL::Vector Pimu_t;
+
 		KDL::JntArray torque_;
         KDL::Wrenches fext_;
 			
@@ -83,7 +106,12 @@ namespace effort_controllers
         bool init(hardware_interface::RobotHW *robot_hw, ros::NodeHandle &n);
         void starting(const ros::Time &time);
         void update(const ros::Time &time, const ros::Duration &duration);
-
+        void wJacobian(KDL::JntArray qp, Eigen::MatrixXd &wJac);
+        void vJacobian(KDL::JntArray qp, Eigen::MatrixXd &vJac);
+        void vJacobianDot(KDL::JntArray qp, KDL::JntArray dqp, Eigen::MatrixXd &vdJac);
+        void pseudoInv(Eigen::MatrixXd &Jac, Eigen::MatrixXd &invJac);
+        void mRotation2Matrix(KDL::Rotation rot, Eigen::MatrixXd &matrix);
+        void mVectorEigen(KDL::Vector vec, Eigen::VectorXd &eigenV);
     };
 }
 
