@@ -17,6 +17,8 @@
 #include <kdl/chaindynparam.hpp>
 #include <kdl/chainfksolverpos_recursive.hpp>
 #include <kdl/chainfksolvervel_recursive.hpp>
+#include <kdl/chainjnttojacdotsolver.hpp>
+#include <kdl/chainiksolver.hpp>
 
 namespace effort_controllers
 {
@@ -44,7 +46,8 @@ namespace effort_controllers
         KDL::Chain chain_;
         KDL::Chain imuChain_;
         KDL::ChainIdSolver_RNE *idsolver_;
-
+        KDL::ChainJntToJacDotSolver *jdsolver_;
+        KDL::ChainJntToJacSolver *jsolver_;
         KDL::JntArray q_;
         KDL::JntArray dq_;
         KDL::JntArray v_;
@@ -64,6 +67,10 @@ namespace effort_controllers
         KDL::Rotation r_p_enu_;
         KDL::JntArray w_imu_imu; // sensor angular rate measure
         KDL::JntArray a_imu_imu; // sensor linear acceleration measure
+        KDL::JntArrayVel qpvel_;
+
+        KDL::Jacobian djac_;
+        KDL::Jacobian jac_;
         
         Eigen::MatrixXd vJacInv_;
         Eigen::MatrixXd vJacDot_;
@@ -71,8 +78,8 @@ namespace effort_controllers
         Eigen::MatrixXd mr_enu_0_;
 		
         Eigen::VectorXd gravity_v_;
-        KDL::Vector Pt_p;
-        KDL::Vector Pimu_t;
+        KDL::Vector pt_p;
+        KDL::Vector pimu_t;
 
 		KDL::JntArray torque_;
         KDL::Wrenches fext_;
