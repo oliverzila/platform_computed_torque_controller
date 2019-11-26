@@ -65,8 +65,7 @@ namespace effort_controllers
         KDL::JntArray w_imu_imu; // sensor angular rate measure
         KDL::JntArray a_imu_imu; // sensor linear acceleration measure
         
-        Eigen::MatrixXd vJacInv_;
-        Eigen::MatrixXd vJacDot_;
+
         KDL::Rotation r_enu_0_;
         Eigen::MatrixXd mr_enu_0_;
 		
@@ -98,9 +97,6 @@ namespace effort_controllers
         void starting(const ros::Time &time);
         void update(const ros::Time &time, const ros::Duration &duration);
         void wJacobian(KDL::JntArray qp, Eigen::MatrixXd &wJac);
-        void vJacobian(KDL::JntArray qp, Eigen::MatrixXd &vJac);
-        void vJacobianDot(KDL::JntArray qp, KDL::JntArray dqp, Eigen::MatrixXd &vdJac);
-        void pseudoInv(Eigen::MatrixXd &Jac, Eigen::MatrixXd &invJac);
         void mRotation2Matrix(KDL::Rotation rot, Eigen::MatrixXd &matrix);
     };
 }

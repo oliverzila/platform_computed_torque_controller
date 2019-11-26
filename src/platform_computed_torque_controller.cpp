@@ -317,11 +317,6 @@ namespace effort_controllers
 		wJacobian(qp_, w_jac_);
 		dqp_.data = w_jac_.transpose()*mr_t_p*mr_imu_t_*w_imu_imu.data;
 
-		// angular acceleration calculation
-        Eigen::MatrixXd v_jac_;
-		vJacobian(qp_, v_jac_);
-		vJacobianDot(qp_, dqp_, vJacDot_);
-		pseudoInv(vJacDot_, vJacInv_);
 		//ddqp_.data = vJacInv_*(mr_t_p*mr_imu_t_*(a_imu_imu.data+mr_enu_0_*mr_imu_enu*gravity_v_)-vJacDot_*dqp_.data);
 		for(unsigned int i=0;i < DOF;i++)
 		{
@@ -340,7 +335,7 @@ namespace effort_controllers
 		qe_int_.data+=(qr_.data-q_.data)*(now_time-last_time);
 		v_.data=ddqr_.data+KpVirt_*(qr_.data-q_.data)+KdVirt_*(dqr_.data-dq_.data)+KiVirt_*qe_int_.data;
 
-		for (int i=0;i<DOF;i++)	v_(i)=0.0;//ddqp_(i); //platform joint accelerations
+		for (int i=0;i<DOF;i++)	v_(i)=0.0;//platform joint accelerations not calculated
 
 		if(idsolver_->CartToJnt(q_,dq_,v_,fext_,torque_) < 0)
 		        ROS_ERROR("KDL inverse dynamics solver failed.");
@@ -386,25 +381,6 @@ namespace effort_controllers
 		0.0, -std::cos(qp(0)),
 		1.0, 0.0).finished();
 	}
-	void PlatformComputedTorqueController::vJacobian(KDL::JntArray qp, Eigen::MatrixXd &vJac)
-	{ //TODO update
-		vJac = (Eigen::MatrixXd(3,2) << 
-		1.0, 0.0, 
-		0.0, std::cos(qp(0)),
-		0.0, std::sin(qp(0))).finished();
-	}
-	void PlatformComputedTorqueController::vJacobianDot(KDL::JntArray qp, KDL::JntArray dqp, Eigen::MatrixXd &vdJac)
-	{ //TODO updade
-		vdJac = (Eigen::MatrixXd(3,2) << 
-		1.0, 0.0, 
-		0.0, std::cos(qp(0)),
-		0.0, std::sin(qp(0))).finished();
-	}
-	void PlatformComputedTorqueController::pseudoInv(Eigen::MatrixXd &Jac, Eigen::MatrixXd &invJac)
-	{
-		//invJac = ((Jac.transpose()*Jac).inverse())*Jac.transpose();
-	}
-	
 
 	void PlatformComputedTorqueController::mRotation2Matrix(KDL::Rotation rot, Eigen::MatrixXd &matrix)
 	{
