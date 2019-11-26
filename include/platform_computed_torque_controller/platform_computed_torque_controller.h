@@ -71,8 +71,6 @@ namespace effort_controllers
         Eigen::MatrixXd mr_enu_0_;
 		
         Eigen::VectorXd gravity_v_;
-        KDL::Vector Pt_p;
-        KDL::Vector Pimu_t;
 
 		KDL::JntArray torque_;
         KDL::Wrenches fext_;
@@ -104,7 +102,6 @@ namespace effort_controllers
         void vJacobianDot(KDL::JntArray qp, KDL::JntArray dqp, Eigen::MatrixXd &vdJac);
         void pseudoInv(Eigen::MatrixXd &Jac, Eigen::MatrixXd &invJac);
         void mRotation2Matrix(KDL::Rotation rot, Eigen::MatrixXd &matrix);
-        void mVectorEigen(KDL::Vector vec, Eigen::VectorXd &eigenV);
     };
 }
 

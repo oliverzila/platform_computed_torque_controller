@@ -83,11 +83,9 @@ namespace effort_controllers
 		// 	return false;
 		// }
 
-		// Command Topic
         sub_command_ = node_.subscribe("command", 1,
                     &PlatformComputedTorqueController::commandCB, this);
 
-		// IMU Topic
         sub_imu_ = node_.subscribe("imu/data", 1,
                     &PlatformComputedTorqueController::imuCB, this);
         
@@ -104,58 +102,31 @@ namespace effort_controllers
             return false;
         }
 		
-		//robot chain tip
+		//ROBOT + PLATFORM
 		std::string chainTip;
 		if(!node_.getParam("chain/tip",chainTip))
 		{
 			ROS_ERROR("Could not find 'chain/tip' parameter.");
 			return false;
 		}
-
-		//platform root
 		std::string platformRoot;
 		if(!node_.getParam("platform_chain/root",platformRoot))
 		{
 			ROS_ERROR("Could not find 'platform_root' parameter.");
 			return false;
 		}
-		
-		//platform + robot chain
 		if (!tree_.getChain(platformRoot,chainTip,chain_)) 
 		{
 			ROS_ERROR("Could not find 'chain/tip' parameter.");
 			return false;
 		}
-
-		
-		//IMU PLATFORM - TOP
-		std::string imuTip;
-		if(!node_.getParam("chain/tip",imuTip))
-		{
-			ROS_ERROR("Could not find 'chain/tip' parameter.");
-			return false;
-		}
-
-		//platform top
-		std::string platformTop;
-		if(!node_.getParam("imu_top_chain/root",platformTop))
-		{
-			ROS_ERROR("Could not find 'platform_root' parameter.");
-			return false;
-		}
-		
-		//platform top + imu
-		if (!tree_.getChain(platformTop,imuTip,imuChain_)) 
-		{
-			ROS_ERROR("Could not find 'chain/tip' parameter.");
-			return false;
-		}
+		//END ROBOT + PLATFORM
 
         KDL::Vector g;
         node_.param("gravity/x",g[0],0.0);
         node_.param("gravity/y",g[1],0.0);
         node_.param("gravity/z",g[2],-9.8);
-		mVectorEigen(g,gravity_v_);
+		gravity_v_ = (Eigen::VectorXd(3) << g.data[0], g.data[1], g.data[2]).finished();
         
         if((idsolver_=new::KDL::ChainIdSolver_RNE(chain_,g))==NULL)
         {
@@ -241,38 +212,6 @@ namespace effort_controllers
 		}
 		r_p_enu_=KDL::Rotation::RPY(imu_joint_rpy_(0),
 		imu_joint_rpy_(1),imu_joint_rpy_(2));
-		// remaining parameters
-		if(!node_.getParam("platform_imu_top/x",Pimu_t(0)))
-		{
-			ROS_WARN("No platform_imu_top/x defined for imu, assuming zero");
-			Pimu_t(0)=0.0;
-		}
-		if(!node_.getParam("platform_imu_top/y",Pimu_t(1)))
-		{
-			ROS_WARN("No platform_imu_top/y defined for imu, assuming zero");
-			Pimu_t(1)=0.0;
-		}
-		if(!node_.getParam("platform_imu_top/z",Pimu_t(2)))
-		{
-			ROS_WARN("No platform_imu_top/x defined for imu, assuming zero");
-			Pimu_t(0)=0.0;
-		}
-
-		if(!node_.getParam("platform_top_base/x",Pt_p(0)))
-		{
-			ROS_WARN("No platform_top_base/x defined for imu, assuming zero");
-			Pt_p(0)=0.0;
-		}
-		if(!node_.getParam("platform_top_base/y",Pt_p(1)))
-		{
-			ROS_WARN("No platform_top_base/y defined for imu, assuming zero");
-			Pt_p(1)=0.0;
-		}
-		if(!node_.getParam("platform_top_base/z",Pt_p(2)))
-		{
-			ROS_WARN("No platform_top_base/x defined for imu, assuming zero");
-			Pt_p(0)=0.0;
-		}
 		
 		Kp_.resize(nJoints_,nJoints_);
 		Kd_.resize(nJoints_,nJoints_);
@@ -360,6 +299,40 @@ namespace effort_controllers
 			dq_(i+DOF)=joints_[i].getVelocity();
 		}
 
+		//BEGIN PLATFORM STATE
+		// oreintation calculation
+		Eigen::MatrixXd mr_imu_enu;
+		KDL::Rotation r_imu_enu = KDL::Rotation::Quaternion(quatp_(0),quatp_(1),quatp_(2),quatp_(3));
+		mRotation2Matrix(r_imu_enu, mr_imu_enu);
+
+        Eigen::MatrixXd mr_t_p;
+		KDL::Rotation r_t_p = r_p_enu_*r_imu_enu*r_imu_t_.Inverse();
+		mRotation2Matrix(r_t_p,mr_t_p);
+
+		// platform orientation as joint angles
+		r_t_p.GetRPY(qp_(0),qp_(1),qp_(2));
+
+		// angular velocity calculation
+		Eigen::MatrixXd w_jac_;
+		wJacobian(qp_, w_jac_);
+		dqp_.data = w_jac_.transpose()*mr_t_p*mr_imu_t_*w_imu_imu.data;
+
+		// angular acceleration calculation
+        Eigen::MatrixXd v_jac_;
+		vJacobian(qp_, v_jac_);
+		vJacobianDot(qp_, dqp_, vJacDot_);
+		pseudoInv(vJacDot_, vJacInv_);
+		//ddqp_.data = vJacInv_*(mr_t_p*mr_imu_t_*(a_imu_imu.data+mr_enu_0_*mr_imu_enu*gravity_v_)-vJacDot_*dqp_.data);
+		for(unsigned int i=0;i < DOF;i++)
+		{
+			q_(i)= qp_(i);
+			dq_(i)= dqp_(i);
+			
+			qr_(i)=q_(i);
+			dqr_(i)=dq_(i);
+		}
+		//END PLATFORM STATE
+
 		for(unsigned int i=0;i < fext_.size();i++) fext_[i].Zero();
 
 		now_time = ros::Time::now().toSec();
@@ -367,7 +340,7 @@ namespace effort_controllers
 		qe_int_.data+=(qr_.data-q_.data)*(now_time-last_time);
 		v_.data=ddqr_.data+KpVirt_*(qr_.data-q_.data)+KdVirt_*(dqr_.data-dq_.data)+KiVirt_*qe_int_.data;
 
-		for (int i=0;i<DOF;i++)	v_(i)=0.0;//ddqp_(i); // platform joint accelerations
+		for (int i=0;i<DOF;i++)	v_(i)=0.0;//ddqp_(i); //platform joint accelerations
 
 		if(idsolver_->CartToJnt(q_,dq_,v_,fext_,torque_) < 0)
 		        ROS_ERROR("KDL inverse dynamics solver failed.");
@@ -375,12 +348,6 @@ namespace effort_controllers
 		        joints_[i].setCommand(torque_(i+DOF));
 		
 		last_time=now_time;
-		/* ----TESTES IMU---- */
-		std::cout<<"|-----------------------------------------|"<<std::endl;
-		std::cout<<"Roll: "<<qp_(0)<<" Pitch: "<<qp_(1)<<" Yaw: "<<qp_(2)<<std::endl;
-		std::cout<<"Wx: "<<dqp_(0)<<" Wy: "<<dqp_(1)<<" Wz: "<<dqp_(2)<<std::endl;
-		std::cout<<"NU: \n"<<v_(0)<<"  "<<v_(1)<<std::endl;
-
 	}
 
 
@@ -398,7 +365,6 @@ namespace effort_controllers
 
 	void PlatformComputedTorqueController::imuCB(const sensor_msgs::Imu::ConstPtr &imu_data)
 	{
-		// sensor reading
 		quatp_(0) = imu_data->orientation.x;
 		quatp_(1) = imu_data->orientation.y;
 		quatp_(2) = imu_data->orientation.z;
@@ -411,38 +377,6 @@ namespace effort_controllers
 		a_imu_imu(0) = imu_data->linear_acceleration.x;
 		a_imu_imu(1) = imu_data->linear_acceleration.y;
 		a_imu_imu(2) = imu_data->linear_acceleration.z;
-
-		// oreintation calculation
-		Eigen::MatrixXd mr_imu_enu;
-		KDL::Rotation r_imu_enu = KDL::Rotation::Quaternion(quatp_(0),quatp_(1),quatp_(2),quatp_(3));
-		mRotation2Matrix(r_imu_enu, mr_imu_enu);
-		KDL::Rotation r_t_p = r_p_enu_*r_imu_enu*r_imu_t_.Inverse();
-
-
-        Eigen::MatrixXd mr_t_p;
-		mRotation2Matrix(r_t_p,mr_t_p);
-		// platform orientation as joint angles
-		r_t_p.GetRPY(qp_(0),qp_(1),qp_(2));
-		// qp_(0)= std::atan2(-r_t_p(2,1),r_t_p(1,1)); //atan2(-r_t_p(3,2),r_t_p(2,2))
-		// qp_(1)= std::atan2(-r_t_p(0,2),r_t_p(0,0)); //atan2(-r_t_p(1,3),r_t_p(1,1))
-		// angular velocity calculation
-		Eigen::MatrixXd w_jac_;
-		wJacobian(qp_, w_jac_);
-		dqp_.data = w_jac_.transpose()*mr_t_p*mr_imu_t_*w_imu_imu.data;
-		// angular acceleration calculation
-        Eigen::MatrixXd v_jac_;
-		vJacobian(qp_, v_jac_);
-		vJacobianDot(qp_, dqp_, vJacDot_);
-		pseudoInv(vJacDot_, vJacInv_);
-		//ddqp_.data = vJacInv_*(mr_t_p*mr_imu_t_*(a_imu_imu.data+mr_enu_0_*mr_imu_enu*gravity_v_)-vJacDot_*dqp_.data);
-		for(unsigned int i=0;i < DOF;i++)
-		{
-			q_(i)= qp_(i);
-			dq_(i)= dqp_(i);
-			
-			qr_(i)=q_(i);
-			dqr_(i)=dq_(i);
-		}
 	}
 
 	void PlatformComputedTorqueController::wJacobian(KDL::JntArray qp, Eigen::MatrixXd &wJac)
@@ -479,12 +413,6 @@ namespace effort_controllers
 		rot.data[3], rot.data[4], rot.data[5], 
 		rot.data[6], rot.data[7], rot.data[8]).finished();
 	}
-
-	void PlatformComputedTorqueController::mVectorEigen(KDL::Vector vec, Eigen::VectorXd &eigenV)
-	{
-		eigenV = (Eigen::VectorXd(3) << vec.data[0], vec.data[1], vec.data[2]).finished();
-	}
-
 
 }
 
