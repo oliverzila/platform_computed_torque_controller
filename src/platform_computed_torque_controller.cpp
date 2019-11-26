@@ -306,7 +306,7 @@ namespace effort_controllers
 		mRotation2Matrix(r_imu_enu, mr_imu_enu);
 
         Eigen::MatrixXd mr_t_p;
-		KDL::Rotation r_t_p = r_p_enu_*r_imu_enu*r_imu_t_.Inverse();
+		KDL::Rotation r_t_p = r_p_enu_.Inverse()*r_imu_enu*r_imu_t_.Inverse();
 		mRotation2Matrix(r_t_p,mr_t_p);
 
 		// platform orientation as joint angles
