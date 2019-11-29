@@ -6,7 +6,7 @@
             Implements a computed torque controller for robot on a non
             inertial platform. Reference inputs are joint angles, velocities
             and accelerations. Works with an Effort output, so requires an
-            EffortJointInterface.
+            EffortJointInterface. Requires an IMU sensor.
         </description>
     </class>
 </library>

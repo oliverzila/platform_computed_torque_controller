@@ -1,3 +1,29 @@
+/******************************************************************************
+		    ROS platform_computed_torque_controller Package
+                    Platform Computed Torque  Controller
+          		Copyright (C) 2019 Carlos Eduardo Pedroso de Oliveira
+
+        This program is free software: you can redistribute it and/or modify
+        it under the terms of the GNU General Public License as published by
+        the Free Software Foundation, either version 3 of the License, or
+        (at your option) any later version.
+
+        This program is distributed in the hope that it will be useful, but
+        WITHOUT ANY WARRANTY; without even the implied warranty of
+        MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+        General Public License for more details.
+
+        You should have received a copy of the GNU General Public License
+        along with this program.  If not, see
+        <http://www.gnu.org/licenses/>.
+        
+*******************************************************************************/
+
+/*
+	Based on the ROS computed_torque_controller Package
+	Author: Walter Fetter Lages
+*/
+
 #ifndef PLATFORM_TORQUE_CONTROLLER_PLATFORM_TORQUE_CONTROLLER
 #define PLATFORM_TORQUE_CONTROLLER_PLATFORM_TORQUE_CONTROLLER
 
@@ -53,7 +79,7 @@ namespace effort_controllers
 		KDL::JntArray ddqr_;
         KDL::JntArray qe_int_;
 
-        //Platform angles: qp_(0)=pitch qp_(1)=roll
+        //Platform angles: qp_(0)=roll qp_(1)=pitch
         KDL::JntArray quatp_;
         KDL::JntArray qp_;
         KDL::JntArray dqp_;
